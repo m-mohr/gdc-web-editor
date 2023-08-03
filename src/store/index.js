@@ -12,6 +12,7 @@ import files from './files';
 import jobs from './jobs';
 import services from './services';
 import userProcesses from './userProcesses';
+import { Migrate } from '@openeo/js-client/src/gdc.js';
 
 Vue.use(Vuex);
 
@@ -281,6 +282,11 @@ export default new Vuex.Store({
 			process = cx.getters.processes.get(id, namespace);
 			if (!Utils.isObject(process)) {
 				return null;
+			}
+			if (process.version) {
+				// GDC API
+				let response = await cx.state.connection._get(`/processes/${process.id}`);
+				cx.state.connection.processes.add(Migrate.process(response.data));
 			}
 			if (process.namespace !== 'backend') {
 				if (process.namespace === 'user') {
