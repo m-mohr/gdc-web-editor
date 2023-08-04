@@ -1,2 +1,6 @@
-$mainColor: #1665B6;
-$linkColor: #1665B6;
+$mainColor: #547f1b;
+$linkColor: #547f1b;
+
+.logo img {
+  filter: brightness(0) invert(1);
+}

@@ -7,7 +7,7 @@ module.exports = {
 	// If you'd like to host it in a sub-sirectory, e.g. https://editor.openeo.org/somewhere/else/,
 	// you need to set this to `/somewhere/else/`.
 	// You can provide this option via the environment variable CLIENT_URL, too.
-	publicPath: process.env.CLIENT_URL || '/',
+	publicPath: process.env.CLIENT_URL || '/gdc-web-editor/',
 	devServer: {
 		// Port where the development server runs (int)
 		// This is only needed for `npm start`

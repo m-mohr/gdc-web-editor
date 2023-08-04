@@ -5,9 +5,9 @@ export default {
 	serverUrl: '',
 
 	// The name of the service
-	serviceName: 'openEO',
+	serviceName: 'OGC',
 	// The name of the app
-	appName: 'Web Editor',
+	appName: 'GDC Editor',
 
 	// Skip login and automatically load up the "discovery mode"
 	skipLogin: false,
@@ -26,7 +26,7 @@ export default {
 	loginMessage: '',
 
 	// The logo to show
-	logo: './logo.png',
+	logo: 'https://www.ogc.org/wp-content/uploads/2023/03/OGC-1.svg',
 
 	// Defaults for notifications
 	snotifyDefaults: {
