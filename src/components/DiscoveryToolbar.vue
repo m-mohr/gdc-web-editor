@@ -6,7 +6,11 @@
 				<template #summary="{ item }">
 					<div class="discovery-entity" :draggable="supportsLoadCollection" @dragstart="onDrag($event, 'collection', item)">
 						<div class="discovery-info" @click="showCollectionInfo(item.id)">
-							<strong :title="item.id">{{ item.id }}</strong>
+							<strong :title="item.id">
+								<i v-if="item.ogcapi" title="OGC API Collection" class="type">OGC</i>
+								<i v-else-if="item['cube:dimensions']" title="openEO Collection" class="type">openEO</i>
+								{{ item.id }}
+							</strong>
 							<small v-if="item.title" :title="item.title">{{ item.title }}</small>
 						</div>
 						<button v-if="hasCollectionPreview(item)" class="discovery-button" type="button" @click="showCollectionPreview(item)" title="View on map"><i class="fas fa-map"></i></button>
@@ -20,7 +24,11 @@
 						<div class="discovery-info" @click="showProcess(item)">
 							<i v-if="item.namespace === 'user'" class="custom-process fas fa-xs fa-sitemap" title="Custom Process"></i>
 							<i v-else-if="item.namespace !== 'backend'" class="custom-process fas fa-xs fa-tag" :title="`Process from namespace '${item.namespace}'`"></i>
-							<strong :title="item.id">{{ item.id }}</strong>
+							<strong :title="item.id">
+								<i v-if="item.ogcapi" title="OGC API Process" class="type">OGC</i>
+								<i v-else title="openEO Process" class="type">openEO</i>
+								{{ item.id }}
+							</strong>
 							<small v-if="item.summary" :title="item.summary">{{ item.summary }}</small>
 						</div>
 					</div>
@@ -288,6 +296,11 @@ export default {
 		position: absolute;
 		top: 7px;
 		right: 5px;
+	}
+	.type {
+		display: inline-block;
+		margin-right: 0.5em;
+		color: black !important;
 	}
 }
 </style>

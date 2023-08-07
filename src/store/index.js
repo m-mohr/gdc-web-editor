@@ -283,7 +283,7 @@ export default new Vuex.Store({
 			if (!Utils.isObject(process)) {
 				return null;
 			}
-			if (process.version) {
+			if (typeof process.version !== 'undefined') {
 				// GDC API
 				let response = await cx.state.connection._get(`/processes/${process.id}`);
 				cx.state.connection.processes.add(Migrate.process(response.data));

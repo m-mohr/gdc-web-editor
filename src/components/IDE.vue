@@ -30,7 +30,7 @@
 							<UserWorkspace v-if="isAuthenticated" class="userContent tour-ide-workspace" />
 							<div v-else class="message info" title="Login is required to interact with the server.">
 								<i class="fas fa-sign-in-alt"></i>
-								<span class="login-message"><strong><a @click="login">Log in</a></strong> is required to interact with the server.</span>
+								<span class="login-message"><strong><a @click="login">Log in</a></strong> is required to interact with the server. (<a @click="ignoreLogin">Ignore</a>)</span>
 							</div>
 						</Pane>
 					</Splitpanes>
@@ -161,9 +161,12 @@ export default {
 	},
 	methods: {
 		...Utils.mapActions(['describeAccount']),
-		...Utils.mapMutations(['discoveryCompleted']),
+		...Utils.mapMutations(['authenticated', 'discoveryCompleted']),
 		...Utils.mapMutations('editor', ['setContext', 'setProcess', 'setCollectionPreview']),
 
+		ignoreLogin() {
+			this.authenticated(true);
+		},
 		resized(event) {
 			this.broadcast('windowResized', event);
 		},
