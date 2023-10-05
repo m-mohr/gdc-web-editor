@@ -60,8 +60,13 @@ export default {
 	// List of supported wizards
 	supportedWizards: [
 		{
+			component: 'DownloadCoverage',
+			title: 'Download Coverage Data (OGC API)',
+			description: 'Download a portion of data from a coverage.'
+		},
+		{
 			component: 'SpectralIndices',
-			title: 'Compute Spectral Indices',
+			title: 'Compute Spectral Indices (openEO)',
 			description: 'A spectral index is a mathematical equation that is applied on the various spectral bands of an image per pixel. It is often used to highlight vegetation, urban areas, snow, burn, soil, or water/drought/moisture stress. Provided by Awesome Spectral Indices (https://github.com/awesome-spectral-indices/awesome-spectral-indices).',
 			requiredProcesses: ['reduce_dimension']
 		}

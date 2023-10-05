@@ -2,6 +2,14 @@
 	<Modal width="80%" :title="collection.id" @closed="$emit('closed')">
 		<div class="docgen">
 			<Collection :data="collection" />
+			<section v-if="isCoverage">
+				<h2>Coverage</h2>
+				<button @click="downloadCoverage"><i class="fas fa-download"></i> Download</button>
+				<section v-for="(obj, type) in coverage" :key="obj.type">
+					<h3>{{ type }}</h3>
+					<ObjectTree :data="obj" />
+				</section>
+			</section>
 			<section v-if="currentItems">
 				<Items :items="currentItems">
 					<template #item-location="p">
@@ -21,20 +29,26 @@
 import Modal from './Modal.vue';
 import Collection from '../Collection.vue';
 import Utils from '../../utils.js';
+import EventBusMixin from '../EventBusMixin';
 
 export default {
 	name: 'CollectionModal',
+	mixins: [
+		EventBusMixin
+	],
 	components: {
 		MapExtentViewer: () => import('../maps/MapExtentViewer.vue'),
 		Modal,
 		Collection,
-		Items: () => import('@openeo/vue-components/components/Items.vue')
+		Items: () => import('@openeo/vue-components/components/Items.vue'),
+		ObjectTree: () => import('@openeo/vue-components/components/ObjectTree.vue')
 	},
 	data() {
 		return {
 			items: [],
 			itemsPage: 0,
-			itemsIterator: null
+			itemsIterator: null,
+			coverage: {}
 		};
 	},
 	props: {
@@ -53,19 +67,53 @@ export default {
 		},
 		hasPrevItems() {
 			return (this.itemsPage > 0);
-		},
+		},	
 		hasNextItems() {
 			return (this.itemsPage < this.items.length - 1);
-		}
+		},
+		isCoverage() {
+			return Utils.isCoverage(this.collection);
+		},
 	},
 	async mounted() {
-		if (this.supports('listCollectionItems')) {
+		if (this.supports('listCollectionItems') || Utils.getLink(this.collection, 'items')) {
 			await this.nextItems();
 			// Always request a page in advance so that we know whether a next page is available.
 			this.nextItems();
 		}
+		if (this.isCoverage) {
+			const requests = [];
+			
+			let domainset = Utils.getLink(this.collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage-domainset');
+			if (domainset) {
+				requests.push(
+					this.connection._get(domainset.href)
+						.then(r => {
+							this.$set(this.coverage, 'DomainSet', r.data.generalGrid);
+							if (r.data.interpolationRestriction) {
+								this.$set(this.coverage, 'InterpolationRestriction ', r.data.interpolationRestriction);
+							}
+						})
+				);
+			}
+
+			let rangetype = Utils.getLink(this.collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage-rangetype');
+			if (rangetype) {
+				requests.push(
+					this.connection._get(rangetype.href)
+						.then(r => this.$set(this.coverage, 'DataRecord', r.data.field))
+				);
+			}
+
+			try {
+				await Promise.all(requests);
+			} catch (error) {}
+		}
 	},
 	methods: {
+		downloadCoverage() {
+			this.broadcast('showWizard', 'DownloadCoverage', {cid: this.collection.id}, false);
+		},
 		async paginate(step) {
 			if (step > 0) {
 				await this.nextItems();

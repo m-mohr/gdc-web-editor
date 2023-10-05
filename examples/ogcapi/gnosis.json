@@ -1,0 +1,19 @@
+{
+  "process": "https://example.com/processes/RenderMap",
+  "inputs": {
+    "layers": [
+      {
+        "href": "https://example.com/collections/SRTM_ViewFinderPanorama/coverage?subset=Lat%28-37.247997436523434%3A39.432002563476566%29%2CLon%28-21.360483254371445%3A54.21995003256825%29"
+      }
+    ],
+    "background": "navy",
+    "transparent": false
+  },
+  "outputs": {
+    "map": {
+      "format": {
+        "mediaType": "image/png"
+      }
+    }
+  }
+}

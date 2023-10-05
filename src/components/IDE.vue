@@ -133,6 +133,7 @@ export default {
 		this.listen('editProcess', this.editProcess);
 		this.listen('showLogin', this.login);
 		this.listen('importProcess', this.importProcess);
+		this.listen('showWizard', this.showWizard);
 
 		this.resizeListener = event => this.resized(event);
 		window.addEventListener('resize', this.resizeListener);
@@ -193,8 +194,8 @@ export default {
 			this.broadcast('showModal', 'ExportCodeModal');
 		},
 
-		showWizard(preselectUsecase = null, options = {}) {
-			if (this.hasProcess) {
+		showWizard(preselectUsecase = null, options = {}, confirmClearProcess = true) {
+			if (this.hasProcess && confirmClearProcess) {
 				var confirmed = confirm("Starting the wizard may clear the existing model.\r\nDo you really want to continue?");
 				if (!confirmed) {
 					return;

@@ -2,6 +2,11 @@
 	<Modal width="60%" :title="title" @closed="$emit('closed')">
 		<div class="vue-component server-info">
 			<Capabilities :capabilities="capabilities" :url="url" />
+			
+			<template v-if="conformance.length > 0">
+				<h3>Conformance Classes</h3>
+				<ObjectTree :data="conformance" />
+			</template>
 
 			<h3>File formats</h3>
 			<FileFormats :formats="fileFormats" searchTerm="" :heading="null" />
@@ -30,7 +35,8 @@ export default {
 		Capabilities,
 		FileFormats,
 		ServiceTypes,
-		UdfRuntimes
+		UdfRuntimes,
+		ObjectTree: () => import('@openeo/vue-components/components/ObjectTree.vue')
 	},
 	computed: {
 		...Utils.mapState(['connection', 'serviceTypes', 'udfRuntimes']),
@@ -43,6 +49,9 @@ export default {
 		},
 		title() {
 			return this.connection.capabilities().title() || 'Server information';
+		},
+		conformance() {
+			return this.connection.capabilities().getConformanceClasses();
 		}
 	}
 }

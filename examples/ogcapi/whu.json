@@ -1,0 +1,23 @@
+{
+  "process": "https://example.com/processes/aggregate",
+  "inputs": {
+      "data": {
+          "process": "https://example.com/processes/normalize",
+          "inputs": {
+              "data": {
+                  "process": "https://example.com/processes/loadCube",
+                  "inputs": {
+                      "cubeName": "SENTINEL-2 Level-2A MSI",
+                      "extent": "4.6819,51.6876,4.8784,51.8346",
+                      "startTime": "2019-01-17 08:59:59",
+                      "endTime": "2019-01-19 21:00:01"
+                  }
+              },
+              "dimensionName": "bands",
+              "dimensionMembers": ["B8", "B3"]
+          }
+      },
+      "dimensionName": "time",
+      "method": "mean"
+  }
+}

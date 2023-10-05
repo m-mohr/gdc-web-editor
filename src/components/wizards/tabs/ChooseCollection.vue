@@ -35,7 +35,7 @@ export default {
 		},
 		filter: {
 			type: Function,
-			default: null
+			default: collection => !collection.ogcapi
 		}
 	},
 	computed: {

@@ -4,7 +4,24 @@ import { mapState, mapActions, mapMutations, mapGetters } from 'vuex';
 import contentType from 'content-type';
 import Config from '../config';
 
+export const JSON_TYPES = [
+	'application/json',
+	'text/json',
+	'application/geo+json'
+];
+
 class Utils extends VueUtils {
+
+	static getLink(stac, rel, types = JSON_TYPES) {
+		if (!Array.isArray(stac.links)) {
+			return null;
+		}
+		return stac.links.find(link => link.rel === rel && (!types || types.includes(link.type))) || null;
+	}
+
+	static isCoverage(collection) {
+		return Utils.getLink(collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage', null);
+	}
 
 	static getPreviewLinkFromSTAC(stac) {
 		if (Utils.isObject(stac) && Array.isArray(stac.links)) {

@@ -12,7 +12,7 @@ import files from './files';
 import jobs from './jobs';
 import services from './services';
 import userProcesses from './userProcesses';
-import { Migrate } from '@openeo/js-client/src/gdc.js';
+import { Migrate } from '@openeo/js-client/src/gdc/migrate.js';
 
 Vue.use(Vuex);
 
@@ -235,6 +235,12 @@ export default new Vuex.Store({
 			promises.push(promise);
 
 			await Promise.all(promises);
+
+			if (!cx.state.connection.processes.has('load_collection')) {
+				let lc = require('../assets/load_collection.json');
+				lc.hide = true;
+				cx.state.connection.processes.add(lc);
+			}
 
 			// Request initial process
 			if (!refresh) {

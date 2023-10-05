@@ -7,7 +7,10 @@
 					<div class="discovery-entity" :draggable="supportsLoadCollection" @dragstart="onDrag($event, 'collection', item)">
 						<div class="discovery-info" @click="showCollectionInfo(item.id)">
 							<strong :title="item.id">
-								<i v-if="item.ogcapi" title="OGC API Collection" class="type">OGC</i>
+								<i v-if="item.ogcapi" title="OGC API Collection" class="type">
+									OGC
+									<span v-if="isCoverage(item)">Coverage</span>
+								</i>
 								<i v-else-if="item['cube:dimensions']" title="openEO Collection" class="type">openEO</i>
 								{{ item.id }}
 							</strong>
@@ -116,7 +119,7 @@ export default {
 			return Utils.size(this.udfRuntimes);
 		},
 		allProcesses() {
-			return this.processes.all();
+			return this.processes.all().filter(process => !process.hide);
 		},
 		searchTerm: {
 			get() {
@@ -162,6 +165,9 @@ export default {
 			else {
 				fn(false);
 			}
+		},
+		isCoverage(collection) {
+			return Utils.isCoverage(collection);
 		},
 		showCollectionInfo(id) {
 			this.broadcast('showCollection', id);

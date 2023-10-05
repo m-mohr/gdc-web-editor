@@ -1,0 +1,29 @@
+{
+  "process_graph": {
+    "load1": {
+      "process_id": "load_collection",
+      "arguments": {
+        "id": "SRTM_ViewFinderPanorama",
+        "spatial_extent": {
+          "west": -21.360483254371445,
+          "east": 54.21995003256825,
+          "south": -37.247997436523434,
+          "north": 39.432002563476566
+        },
+        "temporal_extent": null
+      }
+    },
+    "RenderMap2": {
+      "process_id": "RenderMap",
+      "arguments": {
+        "layers": {
+          "from_node": "load1"
+        },
+        "output:map": "image/png",
+        "background": "navy",
+        "transparent": false
+      },
+      "result": true
+    }
+  }
+}

@@ -17,7 +17,7 @@
 					<i class="fas fa-bullhorn"></i>
 					<span>Please note that this feature is <strong>experimental</strong> and there are chances that the generated models won't work.</span>
 				</div>
-				<p>This wizard helps you to create openEO processes in a simple way for some common use cases.</p>
+				<p>This wizard helps you to access or process data in a simple way for some common use cases.</p>
 				<p>Which use case do you want to work on today?</p>
 				<ul>
 					<template v-for="usecase in usecases">
@@ -84,8 +84,8 @@ export default {
 			usecases: [
 				{
 					component: 'Download',
-					title: 'Download Data',
-					description: 'Just download a small portion of data.'
+					title: 'Download Data (openEO)',
+					description: 'Just download a small portion of data from an openEO Collection.'
 				},
 				{
 					component: 'UDP',
