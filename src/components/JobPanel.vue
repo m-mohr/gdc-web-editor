@@ -284,7 +284,7 @@ export default {
 		showJobInfo(job) {
 			this.refreshElement(job, async (updatedJob) => {
 				let result = null;
-				if (updatedJob.status === 'finished') {
+				if (!updatedJob.extra.ogcapi && updatedJob.status === 'finished') {
 					try {
 						result = await updatedJob.getResultsAsStac();
 					} catch (error) {
@@ -363,7 +363,18 @@ export default {
 				Utils.exception(this, error, 'Cancel Job Error: ' + Utils.getResourceTitle(job));
 			}
 		},
+		async handleGdcResults(job) {
+			if (job.extra.ogcapi) {
+				let url = this.connection.baseUrl + '/jobs/' + job.id + '/results';
+				window.open(url, '_blank');
+				return true;
+			}
+			return false;
+		},
 		async viewResults(job) {
+			if (this.handleGdcResults(job)) {
+				return;
+			}
 			// Doesn't need to go through job store as it doesn't change job-related data
 			try {
 				let stac = await job.getResultsAsStac();
@@ -373,6 +384,9 @@ export default {
 			}
 		},
 		async downloadResults(job) {
+			if (this.handleGdcResults(job)) {
+				return;
+			}
 			// Doesn't need to go through job store as it doesn't change job-related data
 			try {
 				let result = await job.getResultsAsStac();

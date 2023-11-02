@@ -12,7 +12,7 @@ import files from './files';
 import jobs from './jobs';
 import services from './services';
 import userProcesses from './userProcesses';
-import { Migrate } from '@openeo/js-client/src/gdc/migrate.js';
+import Migrate from '@openeo/js-client/src/gdc/migrate.js';
 
 Vue.use(Vuex);
 
