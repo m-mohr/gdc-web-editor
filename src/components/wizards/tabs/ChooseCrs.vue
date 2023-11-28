@@ -1,6 +1,6 @@
 <template>
 	<div class="step choose-crs">
-		<p>Please select the coordinate reference system (CRS) you want to download data in.</p>
+		<p>Please select the coordinate reference system (CRS) you want to data be reprojected to.</p>
 		<SelectBox type="crs" :options="options" :value="value" @input="setCrs" />
 	</div>
 </template>

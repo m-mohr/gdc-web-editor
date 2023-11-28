@@ -11,11 +11,15 @@
 			<ChooseTime v-if="supportsDatetime" v-model="temporal_extent" />
 			<p v-else>Date and time selection not supported by the server. Go ahead please.</p>
 		</WizardTab>
-		<WizardTab :pos="3" :parent="parent" title="CRS" :beforeChange="() => !supportsCrs || crs !== null">
+		<WizardTab :pos="3" :parent="parent" title="CRS">
 			<ChooseCrs v-if="supportsCrs" v-model="crs" :options="crsList" />
 			<p v-else>CRS selection not supported by the server. Go ahead please.</p>
 		</WizardTab>
-		<WizardTab :pos="4" :parent="parent" title="File Format" :beforeChange="() => format !== null">
+		<WizardTab :pos="4" :parent="parent" title="Scaling">
+			<ChooseScale v-if="supportsScaling" v-model="scale" :data="collectionData" />
+			<p v-else>Scaling not supported by the server. Go ahead please.</p>
+		</WizardTab>
+		<WizardTab :pos="5" :parent="parent" title="File Format" :beforeChange="() => format !== null">
 			<ChooseFormat v-model="format" :options="fileFormats" />
 		</WizardTab>
 	</div>
@@ -26,6 +30,7 @@ import ChooseBoundingBox from './tabs/ChooseBoundingBox.vue';
 import ChooseCollection from './tabs/ChooseCollection.vue';
 import ChooseCrs from './tabs/ChooseCrs.vue';
 import ChooseFormat from './tabs/ChooseFormat.vue';
+import ChooseScale from './tabs/ChooseScale.vue';
 import ChooseTime from './tabs/ChooseTime.vue';
 import WizardMixin from './WizardMixin';
 import Utils from '../../utils';
@@ -44,6 +49,7 @@ export default {
 		ChooseCollection,
 		ChooseCrs,
 		ChooseFormat,
+		ChooseScale,
 		ChooseTime
 	},
 	data() {
@@ -52,6 +58,7 @@ export default {
 			collectionData: {},
 			crs: null,
 			format: null,
+			scale: null,
 			spatial_extent: null,
 			max_spatial_extent: null,
 			temporal_extent: null
@@ -175,6 +182,10 @@ export default {
 
 			if (this.crs !== null) {
 				url.searchParams.set('crs', this.crs);
+			}
+	
+			if (this.scale !== null) {
+				url.searchParams.set('scale-factor', this.scale);
 			}
 
 			// Not supported: bbox-crs, subset-crs, subset (use bbox/datetime) instead, properties, scale-axes, scale-size
