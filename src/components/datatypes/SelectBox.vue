@@ -98,6 +98,8 @@ export default {
 				case 'udf-runtime-version':
 					state = this.context in this.$store.state.udfRuntimes ? Object.keys(this.$store.state.udfRuntimes[this.context].versions) : [];
 					break;
+				default:
+					state = this.options;
 			}
 
 			if (typeof this.optionFilter === 'function' && state && typeof state === 'object') {
@@ -113,6 +115,23 @@ export default {
 			switch(this.type) {
 				case 'collection-id':
 					return state.map(c => this.e(c.id)).sort(this.sortByLabel);
+				case 'crs':
+					for(const id of state) {
+						let label = id.replace('http://www.opengis.net/def/crs/', '');
+						let epsg = label.match(/^EPSG\/\d+\/(\d+)/i);
+						if (epsg) {
+							let code = Number.parseInt(epsg[1], 10);
+							if (code in this.$store.state.editor.epsgCodes) {
+								label = this.$store.state.editor.epsgCodes[code] + ` (EPSG:${code})`;
+							}
+						}
+						let ogc = label.match(/^OGC\/([^\/]+)\/(.+)/i);
+						if (ogc) {
+							label = ogc[2] + ` (${id})`;
+						}
+						data.push({ id, label });
+					}
+					return data;
 				case 'job-id':
 					return state.map(j => ({
 						id: j.id,
@@ -292,7 +311,7 @@ export default {
 		},
 		async loadData() {
 			this.loaded = false;
-			if (this.type === 'epsg-code') {
+			if (this.type === 'epsg-code' || this.type === 'crs') {
 				await this.loadEpsgCodes();
 			}
 			else if (this.type === 'band-name') {

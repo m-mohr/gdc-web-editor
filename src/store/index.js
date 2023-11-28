@@ -67,6 +67,7 @@ export default new Vuex.Store({
 		},
 		capabilities: (state) => state.connection !== null ? state.connection.capabilities() : null,
 		supports: (state) => (feature) => state.connection !== null && state.connection.capabilities() !== null && state.connection.capabilities().hasFeature(feature),
+		supportsOgc: (state) => (url) => state.connection !== null && state.connection.capabilities() !== null && state.connection.capabilities().hasConformance(url),
 		currency: (state) => {
 			var currency = '';
 			if (state.connection && state.connection.capabilities().currency() !== null) {

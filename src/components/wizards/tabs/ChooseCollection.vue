@@ -50,8 +50,7 @@ export default {
 		}
 	},
 	methods: {
-		...Utils.mapActions(['describeCollection']),
-		async update(id) {
+		update(id) {
 			this.$emit('input', id);
 		},
 		showCollectionInfo(id) {

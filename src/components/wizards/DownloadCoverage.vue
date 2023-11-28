@@ -1,15 +1,21 @@
 <template>
 	<div class="wizard-tab-content">
-		<WizardTab :pos="0" :parent="parent" title="Data Source" :beforeChange="() => collection !== null">
+		<WizardTab :pos="0" :parent="parent" title="Data Source" :beforeChange="loadCollection">
 			<ChooseCollection :value="collection" :filter="filterCollections" @input="submitCollection" ogcapi />
 		</WizardTab>
-		<WizardTab :pos="1" :parent="parent" title="Location" :beforeChange="() => spatial_extent !== null">
-			<ChooseBoundingBox v-model="spatial_extent" :max="max_spatial_extent" />
+		<WizardTab :pos="1" :parent="parent" title="Location" :beforeChange="() => !supportsBbox || spatial_extent !== null">
+			<ChooseBoundingBox v-if="supportsBbox" v-model="spatial_extent" :max="max_spatial_extent" />
+			<p v-else>Bounding box selection not supported by the server. Go ahead please.</p>
 		</WizardTab>
-		<WizardTab :pos="2" :parent="parent" title="Temporal Coverage" :beforeChange="() => temporal_extent !== null">
-			<ChooseTime v-model="temporal_extent" />
+		<WizardTab :pos="2" :parent="parent" title="Temporal Coverage" :beforeChange="() => !supportsDatetime || temporal_extent !== null">
+			<ChooseTime v-if="supportsDatetime" v-model="temporal_extent" />
+			<p v-else>Date and time selection not supported by the server. Go ahead please.</p>
 		</WizardTab>
-		<WizardTab :pos="3" :parent="parent" title="File Format" :beforeChange="() => format !== null">
+		<WizardTab :pos="3" :parent="parent" title="CRS" :beforeChange="() => !supportsCrs || crs !== null">
+			<ChooseCrs v-if="supportsCrs" v-model="crs" :options="crsList" />
+			<p v-else>CRS selection not supported by the server. Go ahead please.</p>
+		</WizardTab>
+		<WizardTab :pos="4" :parent="parent" title="File Format" :beforeChange="() => format !== null">
 			<ChooseFormat v-model="format" :options="fileFormats" />
 		</WizardTab>
 	</div>
@@ -18,6 +24,7 @@
 <script>
 import ChooseBoundingBox from './tabs/ChooseBoundingBox.vue';
 import ChooseCollection from './tabs/ChooseCollection.vue';
+import ChooseCrs from './tabs/ChooseCrs.vue';
 import ChooseFormat from './tabs/ChooseFormat.vue';
 import ChooseTime from './tabs/ChooseTime.vue';
 import WizardMixin from './WizardMixin';
@@ -35,12 +42,15 @@ export default {
 	components: {
 		ChooseBoundingBox,
 		ChooseCollection,
+		ChooseCrs,
 		ChooseFormat,
 		ChooseTime
 	},
 	data() {
 		return {
 			collection: null,
+			collectionData: {},
+			crs: null,
 			format: null,
 			spatial_extent: null,
 			max_spatial_extent: null,
@@ -55,18 +65,28 @@ export default {
 	},
 	created() {
 		this.collection = this.cid;
+		
+		if (this.collection && Array.isArray(this.collections)) {
+			this.collectionData = this.collections.find(c => Utils.isObject(c) && c.id === this.collection) || {};
+		}
 	},
 	computed: {
 		...Utils.mapState(['collections']),
-		...Utils.mapGetters(['processes', 'collectionDefaults']),
-		collectionData() {
-			if (!this.collection || !Array.isArray(this.collections)) {
-				return [];
-			}
-			return this.collections.find(c => c.id === this.collection);
+		...Utils.mapGetters(['processes', 'collectionDefaults', 'supportsOgc']),
+		supportsBbox() {
+			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-bbox');
+		},
+		supportsDatetime() {
+			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-datetime');
+		},
+		supportsScaling() {
+			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-scaling');
+		},
+		supportsCrs() {
+			return this.crsList.length > 1;
 		},
 		coverageLinks() {
-			if (!Utils.isObject(this.collectionData) || !Array.isArray(this.collectionData.links)) {
+			if (!Array.isArray(this.collectionData.links)) {
 				return [];
 			}
 			return this.collectionData.links
@@ -74,9 +94,29 @@ export default {
 		},
 		fileFormats() {
 			return this.coverageLinks.map(link => link.type || DEFAULT_TYPE);
+		},
+		crsList() {
+			if (Array.isArray(this.collectionData.crs)) {
+				return this.collectionData.crs;
+			}
+			return [];
 		}
 	},
 	methods: {
+		...Utils.mapActions(['describeCollection']),
+		async loadCollection() {
+			if (this.collection === null) {
+				throw new Error("Please select a collection");
+			}
+
+			try {
+				this.collectionData = await this.describeCollection(this.collection);
+				return true;
+			} catch(error) {
+				console.error(error);
+				throw new Error("Can't load collection metadata, please try another collection.");
+			}
+		},
 		filterCollections(collection) {
 			 return Utils.isCoverage(collection);
 		},
@@ -132,6 +172,12 @@ export default {
 					url.searchParams.set('datetime', datetime);
 				}
 			}
+
+			if (this.crs !== null) {
+				url.searchParams.set('crs', this.crs);
+			}
+
+			// Not supported: bbox-crs, subset-crs, subset (use bbox/datetime) instead, properties, scale-axes, scale-size
 			
 			let href = url.toString();
 			console.log(href);
