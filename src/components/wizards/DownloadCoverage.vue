@@ -35,6 +35,8 @@ import ChooseTime from './tabs/ChooseTime.vue';
 import WizardMixin from './WizardMixin';
 import Utils from '../../utils';
 import EventBusMixin from '../EventBusMixin';
+import { OpenEO, AbortController } from '@openeo/js-client';
+import { cancellableRequest } from '../cancellableRequest';
 
 const DEFAULT_TYPE = "default";
 
@@ -78,7 +80,7 @@ export default {
 		}
 	},
 	computed: {
-		...Utils.mapState(['collections']),
+		...Utils.mapState(['collections', 'connection']),
 		...Utils.mapGetters(['processes', 'collectionDefaults', 'supportsOgc']),
 		supportsBbox() {
 			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-bbox');
@@ -189,21 +191,19 @@ export default {
 			}
 
 			// Not supported: bbox-crs, subset-crs, subset (use bbox/datetime) instead, properties, scale-axes, scale-size
-			
-			let href = url.toString();
-			console.log(href);
-			let title = `Coverage: ${this.collection}`;
-			let stac = {
-				assets: {
-					coverage: {
-						href,
-						type: this.format,
-						title
-					}
-				}
-			};
 
-			this.broadcast('viewJobResults', stac, null, title);
+			const href = url.toString();
+			console.log(href);
+
+			const callback = async (abortController) => {
+				const response = await this.connection._get(href, {}, OpenEO.Environment.getResponseType(), abortController);
+				let result = {
+					data: response.data,
+					type: response.headers['content-type'] || null
+				};
+				this.broadcast('viewSyncResult', result, `Coverage: ${this.collection}`);
+			};
+			await cancellableRequest(this, callback, 'Coverage request');
 		}
 	}
 }

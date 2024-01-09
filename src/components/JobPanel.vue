@@ -363,7 +363,7 @@ export default {
 				Utils.exception(this, error, 'Cancel Job Error: ' + Utils.getResourceTitle(job));
 			}
 		},
-		async handleGdcResults(job) {
+		handleGdcResults(job) {
 			if (job.extra.ogcapi) {
 				let url = this.connection.baseUrl + '/jobs/' + job.id + '/results';
 				window.open(url, '_blank');

@@ -52,6 +52,18 @@ export class Format {
 		return this.data;
 	}
 
+	withAuth(connection, url) {
+		let auth = false;
+		if (!url.startsWith('blob:')) {
+			try {
+				let apiUrl = new URL(connection.getUrl());
+				let requestUrl = new URL(url);
+				auth = apiUrl.origin === requestUrl.origin;
+			} catch (error) {}
+		}
+		return auth;
+	}
+
 	async fetchData(connection) {
 		let blob;
 		let url = this.getUrl();
@@ -60,14 +72,11 @@ export class Format {
 			blob = await response.blob();
 		}
 		else {
-			let auth = false;
-			try {
-				let apiUrl = new URL(connection.getUrl());
-				let requestUrl = new URL(url);
-				auth = apiUrl.origin === requestUrl.origin;
-			} catch (error) {}
-
-			blob = await connection.download(url, auth);
+			let options = {};
+			if (this.withAuth(connection, url)) {
+				options.headers = connection._getAuthHeaders()
+			}
+			blob = await connection.download(url, options);
 		}
 		let promise = new Promise((resolve, reject) => {
 			let reader = new FileReader();

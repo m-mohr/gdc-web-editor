@@ -35,7 +35,7 @@ class GeoTIFF extends SupportedFormat {
 
 	async loadData(connection) {
 		if (!this.loaded) {
-			await this.parseMetadata();
+			await this.parseMetadata(connection);
 			this.loaded = true;
 		}
 		return this;
@@ -45,7 +45,7 @@ class GeoTIFF extends SupportedFormat {
 		return this;
 	}
 
-	async parseMetadata() {
+	async parseMetadata(connection) {
 		let stacHasExtent = this.stac && (this.stac.geometry || this.stac.extent);
 
 		// Get projection from STAC
@@ -92,7 +92,12 @@ class GeoTIFF extends SupportedFormat {
 			tiff = await tiffFromBlob(this.getBlob());
 		}
 		else {
-			tiff = await tiffFromUrl(this.getUrl());
+			let url = this.getUrl();
+			let options = {};
+			if (this.withAuth(connection, url)) {
+				options.headers = connection._getAuthHeaders()
+			}
+			tiff = await tiffFromUrl(url, options);
 		}
 		this.img = await tiff.getImage();
 

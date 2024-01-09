@@ -152,8 +152,8 @@ export default {
 				this.$refs.tabs.closeTab(tab);
 			}
 		},
-		showSyncResults(result) {
-			let title = this.makeTitle("Result");
+		showSyncResults(result, title = "Result") {
+			title = this.makeTitle(title);
 			// result.data should always be a blob
 			let files = this.registry.createFilesFromBlob(result.data);
 			// Download files to disc so that nothing gets lost
