@@ -158,7 +158,6 @@ export default {
 				else {
 					Utils.exception(this, error);
 				}
-
 			}
 		},
 		jobCreated(job) {
