@@ -3,12 +3,12 @@
 		<WizardTab :pos="0" :parent="parent" title="Data Source" :beforeChange="loadCollection">
 			<ChooseCollection :value="collection" :filter="filterCollections" @input="submitCollection" ogcapi />
 		</WizardTab>
-		<WizardTab :pos="1" :parent="parent" title="Location" :beforeChange="() => !supportsBbox || spatial_extent !== null">
-			<ChooseBoundingBox v-if="supportsBbox" v-model="spatial_extent" :max="max_spatial_extent" />
+		<WizardTab :pos="1" :parent="parent" title="Location" :beforeChange="() => !supportsSubsetting || spatial_extent !== null">
+			<ChooseBoundingBox v-if="supportsSubsetting" v-model="spatial_extent" :max="max_spatial_extent" />
 			<p v-else>Bounding box selection not supported by the server. Go ahead please.</p>
 		</WizardTab>
-		<WizardTab :pos="2" :parent="parent" title="Temporal Coverage" :beforeChange="() => !supportsDatetime || temporal_extent !== null">
-			<ChooseTime v-if="supportsDatetime" v-model="temporal_extent" />
+		<WizardTab :pos="2" :parent="parent" title="Temporal Coverage" :beforeChange="() => !supportsSubsetting || temporal_extent !== null">
+			<ChooseTime v-if="supportsSubsetting" v-model="temporal_extent" />
 			<p v-else>Date and time selection not supported by the server. Go ahead please.</p>
 		</WizardTab>
 		<WizardTab :pos="3" :parent="parent" title="CRS">
@@ -19,8 +19,9 @@
 			<ChooseScale v-if="supportsScaling" v-model="scale" :data="collectionData" />
 			<p v-else>Scaling not supported by the server. Go ahead please.</p>
 		</WizardTab>
+		<!-- todo: field selection -->
 		<WizardTab :pos="5" :parent="parent" title="File Format" :beforeChange="() => format !== null">
-			<ChooseFormat v-model="format" :options="fileFormats" />
+			<ChooseFormat v-model="format" :options="fileFormats" :scale="false" />
 		</WizardTab>
 	</div>
 </template>
@@ -35,7 +36,7 @@ import ChooseTime from './tabs/ChooseTime.vue';
 import WizardMixin from './WizardMixin';
 import Utils from '../../utils';
 import EventBusMixin from '../EventBusMixin';
-import { OpenEO, AbortController } from '@openeo/js-client';
+import { Client } from '@openeo/js-client';
 import { cancellableRequest } from '../cancellableRequest';
 
 const DEFAULT_TYPE = "default";
@@ -82,17 +83,17 @@ export default {
 	computed: {
 		...Utils.mapState(['collections', 'connection']),
 		...Utils.mapGetters(['processes', 'collectionDefaults', 'supportsOgc']),
-		supportsBbox() {
-			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-bbox');
+		supportsSubsetting() {
+			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/1.0/conf/subsetting');
 		},
-		supportsDatetime() {
-			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-datetime');
+		supportsProperties() {
+			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/1.0/conf/fieldselection');
 		},
 		supportsScaling() {
-			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/0.0/conf/coverage-scaling');
+			return this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/1.0/conf/scaling');
 		},
 		supportsCrs() {
-			return this.crsList.length > 1;
+			return this.crsList.length > 1 && this.supportsOgc('http://www.opengis.net/spec/ogcapi-coverages-1/1.0/conf/crs');
 		},
 		coverageLinks() {
 			if (!Array.isArray(this.collectionData.links)) {
@@ -190,13 +191,16 @@ export default {
 				url.searchParams.set('scale-factor', this.scale);
 			}
 
+			if (link.type) {
+				url.searchParams.set('f', link.type);
+			}
+
 			// Not supported: bbox-crs, subset-crs, subset (use bbox/datetime) instead, properties, scale-axes, scale-size
 
 			const href = url.toString();
-			console.log(href);
 
 			const callback = async (abortController) => {
-				const response = await this.connection._get(href, {}, OpenEO.Environment.getResponseType(), abortController);
+				const response = await this.connection._get(href, {}, Client.Environment.getResponseType(), abortController);
 				let result = {
 					data: response.data,
 					type: response.headers['content-type'] || null

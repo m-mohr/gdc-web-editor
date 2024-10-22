@@ -2,7 +2,7 @@
 	<DataTable ref="table" :data="data" :columns="columns" class="JobPanel">
 		<template slot="toolbar">
 			<button title="Add new job for batch processing" @click="createJobFromScript()" v-show="supportsCreate" :disabled="!this.hasProcess"><i class="fas fa-plus"></i> Create Batch Job</button>
-			<button title="Run the process directly and view the results without storing them permanently" @click="executeProcess" v-show="supports('computeResult') || supports('executeOgcProcess')" :disabled="!this.hasProcess"><i class="fas fa-play"></i> Run now</button>
+			<button title="Run the process directly and view the results without storing them permanently" @click="executeProcess" v-show="supports('computeResult')" :disabled="!this.hasProcess"><i class="fas fa-play"></i> Run now</button>
 			<SyncButton v-if="supportsList" name="batch jobs" :sync="() => updateData(true)" />
 		</template>
 		<template #actions="p">
@@ -152,7 +152,7 @@ export default {
 		},
 		async executeProcess() {
 			const callback = async (abortController) => {
-				const result = await this.connection.computeResult(this.process, null, null, abortController);
+				const result = await this.connection.computeResult(this.process, abortController);
 				this.broadcast('viewSyncResult', result);
 			};
 			try {
@@ -201,9 +201,7 @@ export default {
 					process,
 					data.title,
 					data.description,
-					data.plan,
-					data.budget,
-					{log_level: data.log_level}
+					{log_level: data.log_level, plan: data.plan, budget: data.budget}
 				]);
 				this.jobCreated(job);
 				return job;
@@ -339,7 +337,7 @@ export default {
 				Utils.exception(this, error, 'Cancel Job Error: ' + Utils.getResourceTitle(job));
 			}
 		},
-		handleGdcResults(job) {
+		handleOgcResults(job) {
 			if (job.extra.ogcapi) {
 				let url = this.connection.baseUrl + '/jobs/' + job.id + '/results';
 				window.open(url, '_blank');
@@ -348,7 +346,7 @@ export default {
 			return false;
 		},
 		async viewResults(job) {
-			if (this.handleGdcResults(job)) {
+			if (this.handleOgcResults(job)) {
 				return;
 			}
 			// Doesn't need to go through job store as it doesn't change job-related data
@@ -361,7 +359,7 @@ export default {
 			}
 		},
 		async downloadResults(job) {
-			if (this.handleGdcResults(job)) {
+			if (this.handleOgcResults(job)) {
 				return;
 			}
 			// Doesn't need to go through job store as it doesn't change job-related data
