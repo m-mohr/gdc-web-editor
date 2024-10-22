@@ -28,12 +28,18 @@ import SyncButton from './SyncButton.vue';
 import Utils from '../utils.js';
 import { Job } from '@openeo/js-client';
 import { cancellableRequest, showCancellableRequestError, CancellableRequestError } from './cancellableRequest';
+import FieldMixin from './FieldMixin';
+import StacMigrate from '@radiantearth/stac-migrate';
 
 const WorkPanelMixinInstance = WorkPanelMixin('jobs', 'batch job', 'batch jobs');
 
 export default {
 	name: 'JobPanel',
-	mixins: [WorkPanelMixinInstance, EventBusMixin],
+	mixins: [
+		WorkPanelMixinInstance,
+		EventBusMixin,
+		FieldMixin
+	],
 	components: {
 		SyncButton
 	},
@@ -173,46 +179,6 @@ export default {
 			}
 			Utils.confirm(this, 'Job "' + Utils.getResourceTitle(job) + '" created!', buttons);
 		},
-		getTitleField(value = null) {
-			return {
-				name: 'title',
-				label: 'Title',
-				schema: {type: 'string'},
-				default: null,
-				value: value,
-				optional: true
-			};
-		},
-		getDescriptionField(value = null) {
-			return {
-				name: 'description',
-				label: 'Description',
-				schema: {type: 'string', subtype: 'commonmark'},
-				default: null,
-				value: value,
-				description: 'CommonMark (Markdown) is allowed.',
-				optional: true
-			};
-		},
-		getBillingPlanField(value = undefined) {
-			return {
-				name: 'plan',
-				label: 'Billing plan',
-				schema: {type: 'string', subtype: 'billing-plan'},
-				value: value,
-				optional: true
-			};
-		},
-		getBudgetField(value = null) {
-			return {
-				name: 'budget',
-				label: 'Budget limit',
-				schema: {type: 'number', subtype: 'budget'},
-				default: null,
-				value: value,
-				optional: true
-			};
-		},
 		normalizeToDefaultData(data) {
 			if (typeof data.title !== 'undefined' && (typeof data.title !== 'string' || data.title.length === 0)) {
 				data.title = null;
@@ -231,7 +197,14 @@ export default {
 		async createJob(process, data) {
 			try {
 				data = this.normalizeToDefaultData(data);
-				let job = await this.create({parameters: [process, data.title, data.description, data.plan, data.budget]});
+				let job = await this.create([
+					process,
+					data.title,
+					data.description,
+					data.plan,
+					data.budget,
+					{log_level: data.log_level}
+				]);
 				this.jobCreated(job);
 				return job;
 			} catch (error) {
@@ -243,6 +216,7 @@ export default {
 			var fields = [
 				this.getTitleField(),
 				this.getDescriptionField(),
+				this.getLogLevelField(),
 				this.supportsBillingPlans ? this.getBillingPlanField() : null,
 				this.supportsBilling ? this.getBudgetField() : null
 			];
@@ -287,6 +261,7 @@ export default {
 				if (!updatedJob.extra.ogcapi && updatedJob.status === 'finished') {
 					try {
 						result = await updatedJob.getResultsAsStac();
+						result = StacMigrate.stac(result, false);
 					} catch (error) {
 						Utils.exception(this, error, "Load Results Error: " + Utils.getResourceTitle(updatedJob));
 					}
@@ -321,6 +296,7 @@ export default {
 				var fields = [
 					this.getTitleField(job.title),
 					this.getDescriptionField(job.description),
+					this.getLogLevelField(job.log_level),
 					this.supportsBillingPlans ? this.getBillingPlanField(job.plan) : null,
 					this.supportsBilling ? this.getBudgetField(job.budget) : null
 				];
@@ -378,6 +354,7 @@ export default {
 			// Doesn't need to go through job store as it doesn't change job-related data
 			try {
 				let stac = await job.getResultsAsStac();
+				stac = StacMigrate.stac(stac, false);
 				this.broadcast('viewJobResults', stac, job);
 			} catch(error) {
 				Utils.exception(this, error, 'View Result Error: ' + Utils.getResourceTitle(job));
@@ -390,6 +367,7 @@ export default {
 			// Doesn't need to go through job store as it doesn't change job-related data
 			try {
 				let result = await job.getResultsAsStac();
+				result = StacMigrate.stac(result, false);
 				if(Utils.size(result.assets) == 0) {
 					Utils.error(this, 'No results available for job "' + Utils.getResourceTitle(job) + '".');
 					return;
@@ -402,6 +380,7 @@ export default {
 		async shareResults(job) {
 			if (this.canShare) {
 				let result = await job.getResultsAsStac();
+				result = StacMigrate.stac(result, false);
 				let url;
 				let link;
 				if (Array.isArray(result.links)) {

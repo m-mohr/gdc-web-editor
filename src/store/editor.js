@@ -2,6 +2,7 @@ import Vue from 'vue';
 import Utils from '../utils';
 import { Job, Service, UserProcess } from '@openeo/js-client';
 import { ProcessGraph } from '@openeo/js-processgraphs';
+import FormatRegistry from '../formats/formatRegistry.js';
 
 const serverStorage = "serverUrls";
 
@@ -20,7 +21,8 @@ const getDefaultState = () => {
 		openWizardProps: {},
 		collectionPreview: null,
 		viewerOptions: {},
-		modelDnD: null
+		modelDnD: null,
+		formatRegistry: new FormatRegistry(),
 	};
 };
 
@@ -120,19 +122,21 @@ export default {
 				return;
 			}
 
-			try {
-				let response = await axios(cx.state.appMode.resultUrl);
-				if (Utils.isObject(response.data)) {
-					cx.commit('setAppModeData', response.data);
+			if (cx.state.appMode.resultType !== 'service') {
+				try {
+					let response = await axios(cx.state.appMode.resultUrl);
+					if (Utils.isObject(response.data)) {
+						cx.commit('setAppModeData', response.data);
+					}
+				} catch (error) {
+					console.error(error);
+					throw new Error("Sorry, the shared data is not available anymore!");
 				}
-			} catch (error) {
-				console.error(error);
-				throw new Error("Sorry, the shared data is not available anymore!");
 			}
 		}
 	},
 	mutations: {
-		setModelDnd(state, obj = null) {
+		setModelDnD(state, obj = null) {
 			state.modelDnD = obj;
 		},
 		setDiscoverySearchTerm(state, searchTerm) {
@@ -145,24 +149,6 @@ export default {
 			state.initialNode = node;
 		},
 		setAppMode(state, appMode) {
-			if (appMode.channels) {
-				try {
-					appMode.channels = appMode.channels
-						.split(',')
-						.map((row, i) => {
-							let parts = row.split('|');
-							return {
-								id: parseInt(parts[0], 10),
-								name: parts[1],
-								min: parts[2] ? parseFloat(parts[2]) : undefined,
-								max: parts[3] ? parseFloat(parts[3]) : undefined
-							};
-						});
-				} catch (error) {
-					console.error(error);
-					delete appMode.channels;
-				}
-			}
 			state.appMode = {
 				...appMode,
 				title: 'Results',
