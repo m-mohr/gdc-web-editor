@@ -1,27 +1,33 @@
 <template>
-	<Modal width="80%" :title="collection.id" @closed="$emit('closed')">
-		<div class="docgen">
-			<Collection :data="collection" />
-			<section v-if="isCoverage">
-				<h2>Coverage</h2>
-				<button @click="downloadCoverage"><i class="fas fa-download"></i> Download</button>
-				<section v-for="(obj, type) in coverage" :key="obj.type">
-					<h3>{{ type }}</h3>
-					<ObjectTree :data="obj" />
+	<Modal class="collection" width="80%" height="96%" :title="collection.id" @closed="$emit('closed')">
+		<Tabs id="collection-modal" position="bottom">
+			<Tab id="metadata" name="Overview" icon="fa-info" class="docgen">
+				<Collection :data="collection" />
+			</Tab>
+			<Tab id="items" name="Items" icon="fa-images" class="docgen" @show="showHiddenMap=true" @hide="showHiddenMap=false">
+				<section class="items" v-if="currentItems">
+					<Items :items="currentItems" showMap>
+						<template #map="p">
+							<MapExtentViewer :show="showHiddenMap" ref="overview" :footprint="p.geojson" :fill="false"></MapExtentViewer>
+						</template>
+						<template #after-search-box>
+							<div class="pagination">
+								<AsyncButton :fn="() => paginate(-1)" :disabled="!hasPrevItems" fa icon="fas fa-arrow-left">Previous Page</AsyncButton>
+								<AsyncButton :fn="() => paginate(1)" :disabled="!hasNextItems" fa icon="fas fa-arrow-right">Next Page</AsyncButton>
+							</div>
+						</template>
+						<template #item-location="p">
+							<MapExtentViewer :show="showHiddenMap" :footprint="p.geometry"></MapExtentViewer>
+						</template>
+					</Items>
+					<div class="pagination">
+						<AsyncButton :fn="() => paginate(-1)" :disabled="!hasPrevItems" fa icon="fas fa-arrow-left">Previous Page</AsyncButton>
+						<AsyncButton :fn="() => paginate(1)" :disabled="!hasNextItems" fa icon="fas fa-arrow-right">Next Page</AsyncButton>
+					</div>
 				</section>
-			</section>
-			<section v-if="currentItems">
-				<Items :items="currentItems">
-					<template #item-location="p">
-						<MapExtentViewer :footprint="p.geometry"></MapExtentViewer>
-					</template>
-				</Items>
-				<div class="pagination">
-					<button title="Previous page" @click="paginate(-1)" :disabled="!hasPrevItems"><i class="fas fa-arrow-left"></i> Previous Page</button>
-					<button title="Next page" @click="paginate(1)" :disabled="!hasNextItems">Next Page <i class="fas fa-arrow-right"></i></button>
-				</div>
-			</section>
-		</div>
+				<section v-else>Individual items are not available for this collection.</section>
+			</Tab>
+		</Tabs>
 	</Modal>
 </template>
 
@@ -29,7 +35,10 @@
 import Modal from './Modal.vue';
 import Collection from '../Collection.vue';
 import Utils from '../../utils.js';
-import EventBusMixin from '../EventBusMixin';
+import StacMigrate from '@radiantearth/stac-migrate';
+import AsyncButton from '@openeo/vue-components/components/internal/AsyncButton.vue';
+import Tabs from '@openeo/vue-components/components/Tabs.vue';
+import Tab from '@openeo/vue-components/components/Tab.vue';
 
 export default {
 	name: 'CollectionModal',
@@ -37,18 +46,20 @@ export default {
 		EventBusMixin
 	],
 	components: {
+		AsyncButton,
 		MapExtentViewer: () => import('../maps/MapExtentViewer.vue'),
 		Modal,
 		Collection,
 		Items: () => import('@openeo/vue-components/components/Items.vue'),
-		ObjectTree: () => import('@openeo/vue-components/components/ObjectTree.vue')
+		Tabs,
+		Tab
 	},
 	data() {
 		return {
 			items: [],
 			itemsPage: 0,
-			itemsIterator: null,
-			coverage: {}
+			itemPages: null,
+			showHiddenMap: false
 		};
 	},
 	props: {
@@ -57,7 +68,7 @@ export default {
 		}
 	},
 	computed: {
-		...Utils.mapState(['connection']),
+		...Utils.mapState(['connection', 'pageLimit']),
 		...Utils.mapGetters(['supports']),
 		currentItems() {
 			if (this.items.length >= this.itemsPage) {
@@ -69,45 +80,14 @@ export default {
 			return (this.itemsPage > 0);
 		},	
 		hasNextItems() {
-			return (this.itemsPage < this.items.length - 1);
 		},
-		isCoverage() {
-			return Utils.isCoverage(this.collection);
-		},
+		hasNextItems() {
+			return this.itemPages.hasNextPage() || (this.itemsPage < this.items.length - 1);
+		}
 	},
 	async mounted() {
 		if (this.supports('listCollectionItems') || Utils.getLink(this.collection, 'items')) {
 			await this.nextItems();
-			// Always request a page in advance so that we know whether a next page is available.
-			this.nextItems();
-		}
-		if (this.isCoverage) {
-			const requests = [];
-			
-			let domainset = Utils.getLink(this.collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage-domainset');
-			if (domainset) {
-				requests.push(
-					this.connection._get(domainset.href)
-						.then(r => {
-							this.$set(this.coverage, 'DomainSet', r.data.generalGrid);
-							if (r.data.interpolationRestriction) {
-								this.$set(this.coverage, 'InterpolationRestriction ', r.data.interpolationRestriction);
-							}
-						})
-				);
-			}
-
-			let rangetype = Utils.getLink(this.collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage-rangetype');
-			if (rangetype) {
-				requests.push(
-					this.connection._get(rangetype.href)
-						.then(r => this.$set(this.coverage, 'DataRecord', r.data.field))
-				);
-			}
-
-			try {
-				await Promise.all(requests);
-			} catch (error) {}
 		}
 	},
 	methods: {
@@ -125,13 +105,12 @@ export default {
 			this.itemsPage += step;
 		},
 		async nextItems() {
-			if (!this.itemsIterator) {
-				this.itemsIterator = await this.connection.listCollectionItems(this.collection.id);
+			if (!this.itemPages) {
+				this.itemPages = await this.connection.listCollectionItems(this.collection.id, null, null, this.pageLimit);
 			}
-			let next = await this.itemsIterator.next();
-			if (next && next.value && !next.done) {
-				this.items.push(next.value);
-			}
+			let items = await this.itemPages.nextPage();
+			items = items.map(item => StacMigrate.item(item, this.collection, false));
+			this.items.push(items);
 		}
 	}
 }
@@ -152,16 +131,37 @@ export default {
 		font-size: 1.15em;
 	}
 }
-.docgen {
-	.collection > h2 {
-		display: none;
-	}
+.vue-component.collection > h2 {
+	display: none;
+}
 
-	.items > h2 {
-		display: block;
-		font-size: 1.4em;
-		margin-top: 1.5em;
-		border-bottom-style: dotted;
+.vue-component.items > .searchable-list > h2 {
+	display: block;
+	font-size: 1.4em;
+	border-bottom-style: dotted;
+}
+
+.modal.collection {
+	.map-extent {
+		height: 300px;
+	}
+	.modal-content {
+		padding: 0;
+		overflow: hidden;
+		width: 100%;
+		height: 100%;
+	}
+	.items .pagination {
+		margin: 1em 0;
+	}
+	#collection-modal {
+		width: 100%;
+		height: 100%;
+		
+		> .tabsBody > .tabContent {
+			padding: 1em;
+			overflow: auto;
+		}
 	}
 }
 </style>

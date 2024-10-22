@@ -123,15 +123,8 @@ export default {
 		...Utils.mapState(['connectionError', 'authProviders', 'isAuthenticated']),
 		...Utils.mapGetters(['isConnected', 'isDiscovered', 'title']),
 		...Utils.mapState('editor', ['storedServers']),
-		isLocal() {
-			return Boolean(
-				window.location.hostname === 'localhost' ||
-				window.location.hostname === '[::1]' ||
-				window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
-			);
-		},
 		httpsUrl() {
-			if (this.$config.showHttpWarning && !this.isLocal && window.location.protocol === 'http:') {
+			if (this.$config.showHttpWarning && !this.isLocalUrl(window.location) && window.location.protocol === 'http:') {
 				return window.location.toString()
 					.replace(/^http:/i, 'https:')
 					.replace(/([\?&]server=http)(:|%3A)/, '$1s$2');
@@ -244,6 +237,14 @@ export default {
 		...Utils.mapMutations(['reset']),
 		...Utils.mapMutations('editor', ['addServer', 'removeServer']),
 
+		isLocalUrl(url) {
+			return Boolean(
+				url.hostname === 'localhost' ||
+				url.hostname === '[::1]' ||
+				url.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
+			);
+		},
+
 		showHelp() {
 			if (!this.isConnected) {
 				this.broadcast('showTour', 'connect');
@@ -314,11 +315,14 @@ export default {
 			if (!serverUrl.match(/^https?:\/\//i)) {
 				serverUrl = `https://${serverUrl}`;
 			}
+
 			if (!Utils.isUrl(serverUrl)) {
 				Utils.error(this, 'The server given is not a valid URL.');
 				return;
 			}
-			else if (window.location.protocol === 'https:' && serverUrl.toLowerCase().substr(0,6) !== 'https:') {
+
+			const url = new URL(serverUrl);
+			if (window.location.protocol === 'https:' && url.protocol !== 'https:' && !this.isLocalUrl(url)) {
 				Utils.error(this, 'You are trying to connect to a server with HTTP instead of HTTPS, which is insecure and prohibited by web browsers. Please use HTTPS instead.');
 				return;
 			}
@@ -355,10 +359,15 @@ export default {
 					await provider.login(this.username, this.password);
 				}
 				else if (authType === 'oidc') {
+					let offlineScope = true;
 					if (this.oidcClientId) {
 						this.provider.setClientId(this.oidcClientId);
 					}
-					await provider.login(this.oidcOptions, true);
+					else {
+						const client = provider.detectDefaultClient();
+						offlineScope = client && Array.isArray(client.grant_types) && client.grant_types.includes('refresh_token');
+					}
+					await provider.login(this.oidcOptions, offlineScope);
 					provider.addListener('AccessTokenExpired', () => Utils.warn(this, "User session has expired, please login again."));
 					provider.addListener('SilentRenewError', () => Utils.error(this, "You'll be switching to Guest mode in less than a minute.", "Session renewal failed"));
 				}
@@ -423,20 +432,20 @@ export default {
 
 		showServerSelector() {
 			this.broadcast(
-				'showListModal', 
+				"showListModal",
 				"Select previously used server",
 				this.storedServers,
 				[
 					{
-						callback: (url) => {
+						callback: url => {
 							this.serverUrl = url;
 							return true;  // return true to close the modal
 						}
 					},
 					{
-						callback: (url) => this.removeServer(url),
+						callback: url => this.removeServer(url),
 						icon: 'trash',
-						title: 'Delete entry from history'
+						title: 'Delete'
 					}
 				]
 			);

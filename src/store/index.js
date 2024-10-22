@@ -3,6 +3,7 @@ import Vuex from 'vuex';
 
 import { OpenEO, FileTypes, Formula } from '@openeo/js-client';
 import { ProcessRegistry } from '@openeo/js-commons';
+import StacMigrate from '@radiantearth/stac-migrate';
 import Utils from '../utils.js';
 import ProcessRegistryExtension from '../registryExtension.js';
 import Config from '../../config';
@@ -21,8 +22,8 @@ Formula.arrayOperatorMapping = {
 	'sum': '+'
 };
 Formula.reverseOperatorMapping = (() => {
-	let mapping = {};
-	for(var op in Formula.operatorMapping) {
+	const mapping = {};
+	for(const op in Formula.operatorMapping) {
 		mapping[Formula.operatorMapping[op]] = op;
 	}
 	return Object.assign(mapping, Formula.arrayOperatorMapping);
@@ -43,7 +44,13 @@ const getDefaultState = () => {
 		udfRuntimes: {},
 		processesUpdated: 0,
 		collections: [],
-		processNamespaces: Config.processNamespaces || []
+		processNamespaces: Config.processNamespaces || [],
+		pageLimit: Config.pageLimit,
+		federationMissing: {
+			collections: [],
+			processes: [],
+			fileFormats: [],
+		},
 	};
 };
 
@@ -60,20 +67,33 @@ export default new Vuex.Store({
 	getters: {
 		title: (state) => {
 			if (state.connection !== null && state.connection.capabilities() !== null) {
-				var title = state.connection.capabilities().title();
+				const title = state.connection.capabilities().title();
 				return title ? title : state.connection.getUrl();
 			}
 			return null;
 		},
 		capabilities: (state) => state.connection !== null ? state.connection.capabilities() : null,
+
 		supports: (state) => (feature) => state.connection !== null && state.connection.capabilities() !== null && state.connection.capabilities().hasFeature(feature),
 		supportsOgc: (state) => (url) => state.connection !== null && state.connection.capabilities() !== null && state.connection.capabilities().hasConformance(url),
 		currency: (state) => {
-			var currency = '';
+			let currency = '';
 			if (state.connection && state.connection.capabilities().currency() !== null) {
 				currency = state.connection.capabilities().currency();
 			}
 			return currency;
+		},
+		federation: (state) => {
+			if (!state.connection) {
+				return null;
+			}
+			const federation = state.connection.capabilities().listFederation();
+			if (federation.length === 0) {
+				return null;
+			}
+			// convert array of objects, which each have an `id` property, into an object with those IDs as the keys
+			// e.g. [ {id:'f',name:'foo'} ] -> { 'f': {id:'f',name:'foo'} }
+			return federation.reduce((arr, val) => ({ ...arr, [val.id]: val }), {})
 		},
 		isConnected: (state) => state.connection !== null && state.connection.capabilities() !== null,
 		isDiscovered: (state) => state.connection !== null && state.discoveryCompleted,
@@ -82,17 +102,17 @@ export default new Vuex.Store({
 		apiVersion: (state) => state.connection !== null ? state.connection.capabilities().apiVersion() : null,
 		fileFormats: (state) => state.fileFormats instanceof FileTypes ? state.fileFormats.toJSON() : {input: {}, output: {}},
 		collectionDefaults: (state) => (id) => {
-			var collection = state.collections.find(c => c.id === id);
+			const collection = state.collections.find(c => c.id === id);
 			if (!Utils.isObject(collection)) {
 				return {};
 			}
 
-			var spatial_extent = null;
+			let spatial_extent = null;
 			try {
 				spatial_extent = Utils.extentToBBox(collection.extent.spatial.bbox[0]);
 			} catch (error) {}
 
-			var temporal_extent = null;
+			let temporal_extent = null;
 			try {
 				temporal_extent = collection.extent.temporal.interval[0];
 				if (temporal_extent[0] === null && temporal_extent[1] === null) {
@@ -103,7 +123,7 @@ export default new Vuex.Store({
 				}
 			} catch (error) {}
 	
-			var bands = null;
+			let bands = null;
 			return {id, spatial_extent, temporal_extent, bands};
 		},
 		processes: (state) => {
@@ -134,7 +154,7 @@ export default new Vuex.Store({
 			await cx.dispatch('logout');
 
 			// Connect and request capabilities
-			var connection = null;
+			let connection = null;
 			try {
 				connection = await OpenEO.connect(url, {addNamespaceToProcess: true});
 			} catch (error) {
@@ -147,7 +167,7 @@ export default new Vuex.Store({
 
 			// Request auth provider list
 			try {
-				var providers = await connection.listAuthProviders();
+				const providers = await connection.listAuthProviders();
 				cx.commit('authProviders', providers);
 			} catch (error) {
 				cx.commit('setConnectionError', error);
@@ -188,6 +208,7 @@ export default new Vuex.Store({
 				// Request processes
 				if (capabilities.hasFeature('listProcesses')) {
 					promises.push(cx.state.connection.listProcesses()
+						.then(data => cx.state.federationMissing.processes = data['federation:missing'])
 						.catch(error => errors.push(error)));
 				}
 				else {
@@ -231,7 +252,7 @@ export default new Vuex.Store({
 			}
 
 			// Request user account information
-			var promise = cx.dispatch('describeAccount')
+			const promise = cx.dispatch('describeAccount')
 				.catch(error => errors.push(error));
 			promises.push(promise);
 
@@ -252,7 +273,7 @@ export default new Vuex.Store({
 				}
 			}
 
-			// Request batch job result for app mode
+			// Request results for app mode
 			if (!refresh) {
 				try {
 					await cx.dispatch('editor/loadForAppMode');
@@ -268,7 +289,7 @@ export default new Vuex.Store({
 		// Request user account info
 		async describeAccount(cx) {
 			if (cx.getters.supports('describeAccount') && cx.state.isAuthenticated) {
-				var response = await cx.state.connection.describeAccount();
+				const response = await cx.state.connection.describeAccount();
 				cx.commit('userInfo', response);
 			}
 			else {
@@ -280,13 +301,14 @@ export default new Vuex.Store({
 			let collection = cx.state.collections.find(c => c.id === id);
 			if (!collection || !collection._loaded) {
 				collection = await cx.state.connection.describeCollection(id);
+				collection = StacMigrate.collection(collection, false);
 				cx.commit('fillCollection', collection);
 			}
 			return collection;
 		},
 
 		async loadProcess(cx, {id, namespace}) {
-			process = cx.getters.processes.get(id, namespace);
+			const process = cx.getters.processes.get(id, namespace);
 			if (!Utils.isObject(process)) {
 				return null;
 			}
@@ -321,7 +343,7 @@ export default new Vuex.Store({
 
 			if (cx.state.isAuthenticated) {
 				// Logout (mostly for OIDC)
-				var authProvider = cx.state.connection.getAuthProvider();
+				const authProvider = cx.state.connection.getAuthProvider();
 				if (authProvider !== null) {
 					await authProvider.logout();
 				}
@@ -354,12 +376,13 @@ export default new Vuex.Store({
 		},
 		fileFormats(state, fileFormats) {
 			state.fileFormats = fileFormats;
+			state.federationMissing.fileFormats = fileFormats['federation:missing'];
 		},
 		serviceTypes(state, serviceTypes) {
 			// Make keys uppercase for simplicity
 			if (Utils.isObject(serviceTypes)) {
-				var obj = {};
-				for(var key in serviceTypes) {
+				const obj = {};
+				for(const key in serviceTypes) {
 					obj[key.toUpperCase()] = serviceTypes[key];
 				}
 				state.serviceTypes = obj;
@@ -397,8 +420,10 @@ export default new Vuex.Store({
 		},
 		collections(state, data) {
 			state.collections = data.collections
+				.map(c => StacMigrate.collection(c, false))
 				.filter(c => (typeof c.id === 'string'))
 				.sort(Utils.sortById);
+			state.federationMissing.collections = data['federation:missing'];
 		},
 		setConnectionError(state, error) {
 			state.connectionError = error;
@@ -427,6 +452,9 @@ export default new Vuex.Store({
 			else {
 				Vue.delete(state.beforeLogoutListener, key);
 			}
+		},
+		federationMissing(state, federationMissing) {
+			state.federationMissing = federationMissing;
 		}
 	}
 });

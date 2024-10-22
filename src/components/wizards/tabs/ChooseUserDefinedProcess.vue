@@ -1,7 +1,7 @@
 <template>
 	<div class="step choose-process">
 		<p>Please select the user-defined process to execute:</p>
-		<Processes heading="" :processes="filteredProcesses" :offerDetails="false">
+		<Processes heading="" :processes="filteredProcesses" :offerDetails="false" :federation="federation" :missing="federationMissing.processes">
 			<template #summary="{ item }">
 				<div :class="{element: true, selected: item.id == value}">
 					<div class="summary" @click="update(item)">
@@ -46,7 +46,8 @@ export default {
 		}
 	},
 	computed: {
-		...Utils.mapGetters(['processes']),
+		...Utils.mapGetters(['federation', 'processes']),
+		...Utils.mapState(['federationMissing']),
 		filteredProcesses() {
 			return this.processes.namespace(this.namespace || 'user');
 		}

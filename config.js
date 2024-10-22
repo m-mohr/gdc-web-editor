@@ -20,7 +20,7 @@ export default {
 	mapZoom: 4,
 
 	// OSM Nominatim compliant geocoder URL, remove to disable
-	geocoder: "https://nominatim.openstreetmap.org/search/",
+	geocoder: "https://nominatim.openstreetmap.org/search",
 
 	// A message shown on the login page
 	loginMessage: '',
@@ -48,13 +48,18 @@ export default {
 	supportedBatchJobSharingServices: [
 		'ShareEditor',
 		'CopyUrl',
-		'TwitterShare'
+		'BlueskyShare',
+		'MastodonSocialShare',
+		'XShare'
 	],
 
 	// List of supported web service sharing services
 	supportedWebServiceSharingServices: [
+		'ShareEditor',
 		'CopyUrl',
-		'TwitterShare'
+		'BlueskyShare',
+		'MastodonSocialShare',
+		'XShare'
 	],
 
 	// List of supported wizards
@@ -100,6 +105,13 @@ export default {
 
 	// refresh interval for jobs/user data/services etc. in minutes - doesn't apply to logs.
 	// It's recommended to use a value between 1 and 5 minutes.
-	dataRefreshInterval: 2
+	dataRefreshInterval: 2,
+
+	// Show or hide experimental and/or deprecated entites by default (e.g. processes, collections)
+	showExperimentalByDefault: false,
+	showDeprecatedByDefault: false,
+
+	// number of items to show per page in the UI (jobs, services, files, UDPs) - null to disable pagination
+	pageLimit: 50,
 	
 };

@@ -8,6 +8,8 @@ export default (namespace, singular, plural, loadInitially = true) => {
 		},
 		data() {
 			return {
+				name: singular,
+				pluralizedName: plural,
 				syncTimer: null,
 				lastSyncTime: null
 			};
@@ -21,11 +23,16 @@ export default (namespace, singular, plural, loadInitially = true) => {
 			this.stopSyncTimer();
 		},
 		computed: {
+			...Utils.mapGetters(['federation']),
 			...Utils.mapState(namespace, {data: namespace}),
-			...Utils.mapGetters(namespace, ['supportsList', 'supportsCreate', 'supportsRead', 'supportsUpdate', 'supportsDelete'])
+			...Utils.mapState(namespace, ['missing', 'pages', 'hasMore']),
+			...Utils.mapGetters(namespace, ['supportsList', 'supportsCreate', 'supportsRead', 'supportsUpdate', 'supportsDelete']),
+			next() {
+				return this.hasMore ? this.nextPage : null;
+			}
 		},
 		methods: {
-			...Utils.mapActions(namespace, ['list', 'create', 'read', 'update', 'delete']),
+			...Utils.mapActions(namespace, ['list', 'nextPage', 'create', 'read', 'update', 'delete']),
 			getTable() { // To be overridden
 				return this.$refs && this.$refs.table ? this.$refs.table : null;
 			},
@@ -60,6 +67,9 @@ export default (namespace, singular, plural, loadInitially = true) => {
 				} catch(error) {
 					Utils.exception(this, error, "Load " + singular + " error");
 				}
+			},
+			async reloadData() {
+				return await this.updateData(true);
 			},
 			async updateData(force = false) {
 				var table = this.getTable();

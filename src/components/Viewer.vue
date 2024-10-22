@@ -1,11 +1,12 @@
 <template>
 	<div class="viewerContainer" @drop="onDrop" @dragover="allowDrop">
-		<Tabs id="viewerTabs" ref="tabs" @empty="onTabsEmpty">
+		<Tabs id="viewerTabs" ref="tabs" @empty="onTabsEmpty" :allowTabRename="editable">
 			<template #empty>Nothing to show right now...</template>
 			<template #dynamic="{ tab }">
 				<LogViewer v-if="logViewerIcons.includes(tab.icon)" :data="tab.data" @mounted="onMounted" @options="onOptionsChanged" />
-				<MapViewer v-else-if="tab.icon === 'fa-map'" :data="tab.data" :removableLayers="isCollectionPreview(tab.data)" @mounted="onMounted" @options="onOptionsChanged" /> <!-- for services -->
 				<component v-else-if="tab.data.component" :is="tab.data.component" v-on="tab.data.events" v-bind="tab.data.props" @mounted="onMounted" @options="onOptionsChanged" /> <!-- for file formats -->
+				<MetadataViewer v-else-if="tab.icon === 'fa-info'" :data="tab.data" @mounted="onMounted" @options="onOptionsChanged" /> <!-- for STAC metadata -->
+				<MapViewer v-else-if="tab.icon === 'fa-map'" :data="tab.data" :removableLayers="isCollectionPreview(tab.data)" @mounted="onMounted" @options="onOptionsChanged" /> <!-- for services -->
 				<div class="unsupported" v-else>
 					Sorry, the viewer doesn't support showing this type of data.
 					<template v-if="isFormat(tab.data)">
@@ -23,8 +24,8 @@ import EventBusMixin from './EventBusMixin.js';
 import Utils from '../utils.js';
 import Tabs from '@openeo/vue-components/components/Tabs.vue';
 import { Service } from '@openeo/js-client';
-import FormatRegistry from '../formats/formatRegistry';
 import { Format } from '../formats/format';
+import { Formatters } from '@radiantearth/stac-fields';
 
 export default {
 	name: 'Viewer',
@@ -35,7 +36,8 @@ export default {
 		TableViewer: () => import('./viewer/TableViewer.vue'),
 		ImageViewer: () => import('./viewer/ImageViewer.vue'),
 		LogViewer: () => import('./viewer/LogViewer.vue'),
-		MapViewer: () => import('./viewer/MapViewer.vue')
+		MapViewer: () => import('./viewer/MapViewer.vue'),
+		MetadataViewer: () => import('./viewer/MetadataViewer.vue')
 	},
 	mounted() {
 		this.listen('viewSyncResult', this.showSyncResults);
@@ -45,18 +47,14 @@ export default {
 		this.listen('viewLogs', this.showLogs);
 		this.listen('removeWebService', this.closeTabWithLogs);
 		this.listen('removeBatchJob', this.closeTabWithLogs);
+		this.listen('addToMapChooser', this.addToMapChooser);
 
 		if (this.appMode) {
-			this.showJobResults(this.appMode.data, null, this.appMode.title);
-			if (typeof this.appMode.expires === 'string') {
-				let expires = this.appMode.expires.replace('T', '').replace(/(\.\d)?(Z|[+-]\d\d:\d\d])$/, ''); // todo: improve date rendering
-				Utils.info(this, `The shared data is available until ${expires}`);
-			}
+			this.showAppMode();
 		}
 	},
 	data() {
 		return {
-			registry: new FormatRegistry(),
 			tabTitleCounter: {},
 			tabIdCounter: 0,
 			logViewerIcons: [
@@ -67,9 +65,15 @@ export default {
 			options: null
 		}
 	},
+	props: {
+		editable: {
+			type: Boolean,
+			default: true
+		}
+	},
 	computed: {
 		...Utils.mapState(['connection']),
-		...Utils.mapState('editor', ['appMode']),
+		...Utils.mapState('editor', ['appMode', 'formatRegistry']),
 		...Utils.mapGetters('editor', ['getModelNodeFromDnD']),
 		nextTabId() {
 			return `viewer~${this.tabIdCounter}`;
@@ -78,6 +82,23 @@ export default {
 	methods: {
 		...Utils.mapActions(['describeCollection']),
 		...Utils.mapMutations('editor', ['setViewerOptions', 'setModelDnD']),
+		showAppMode() {
+			if (this.appMode.resultType === 'service') {
+				const service = new Service(this.connection, 'app');
+				service.title = this.appMode.title;
+				service.url = this.appMode.resultUrl;
+				service.type = this.appMode.service;
+				service.enabled = true;
+				this.showWebService(service);
+			}
+			else {
+				this.showJobResults(this.appMode.data, null, this.appMode.title, true);
+				if (typeof this.appMode.expires === 'string') {
+					const expires = Formatters.formatTimestamp(this.appMode.expires);
+					Utils.info(this, `The shared data is available until ${expires}`);
+				}
+			}
+		},
 		isCollectionPreview(data) {
 			return (data instanceof Service && Utils.isObject(data.attributes) && data.attributes.preview === true);
 		},
@@ -137,7 +158,7 @@ export default {
 			}
 
 			this.$refs.tabs.addTab(
-				title, faIcon, resource, id, selectTab, true,
+				title, faIcon, resource, id, selectTab, this.editable,
 				tab => this.onShow(tab),
 				tab => this.onHide(tab)
 			);
@@ -155,7 +176,7 @@ export default {
 		showSyncResults(result, title = "Result") {
 			title = this.makeTitle(title);
 			// result.data should always be a blob
-			let files = this.registry.createFilesFromBlob(result.data);
+			let files = this.formatRegistry.createFilesFromBlob(result.data);
 			// Download files to disc so that nothing gets lost
 			files.forEach(file => file.download());
 			// Show the data in the viewer
@@ -168,7 +189,7 @@ export default {
 					}
 				});
 		},
-		showJobResults(stac, job = null, title = null) {
+		showJobResults(stac, job = null, title = null, showMetadata = false) {
 			if (title === null) {
 				if (stac.title) {
 					title = stac.title;
@@ -184,13 +205,16 @@ export default {
 			if (job && job.id) {
 				id = job.id;
 			}
-			let files = this.registry.createFilesFromSTAC(stac, job);
+			let files = this.formatRegistry.createFilesFromSTAC(stac, job);
 			if (files.length === 0) {
 				Utils.error(this, 'No results available for "' + title + '".');
 				return;
 			}
-			else if (files.length > 5 && !confirm(`You are about to open ${files.length} individual files / tabs, which could slow down the web browser. Are you sure you want to open all of them?`)) {
+			else if (files.length > 5 && !Utils.confirmOpenAll(files)) {
 				return;
+			}
+			if (showMetadata) {
+				this.showMetadataViewer(stac, id, title);
 			}
 			this.showViewer(files, title, file => `${id}-${file.getUrl()}`, true)
 				.catch(error => Utils.exception(this, error));
@@ -213,10 +237,54 @@ export default {
 				}
 			}
 			this.$refs.tabs.addTab(
-				title, "fa-map", resource, id, true, true,
+				title, "fa-map", resource, id, true, this.editable,
 				tab => this.onShow(tab),
 				tab => this.onHide(tab),
 				onClose
+			);
+		},
+		showMetadataViewer(resource, id = null, title = null) {
+			if (!title) {
+				title = Utils.getResourceTitle(resource, true);
+			}
+			if (!id) {
+				id = this.nextTabId;
+				this.tabIdCounter++;
+			}
+			this.$refs.tabs.addTab(
+				title, "fa-info", resource, id, true, this.editable,
+				tab => this.onShow(tab),
+				tab => this.onHide(tab)
+			);
+		},
+		addToMapChooser({asset, context}) {
+			const openMapTabs = this.$refs.tabs.tabs.filter(tab => tab.icon === 'fa-map');
+			const maps = [
+				"New Map",
+				...openMapTabs.map(tab => tab.name)
+			];
+			this.broadcast(
+				"showListModal", 
+				"Select a map to add the data to",
+				maps,
+				[
+					{
+						callback: async (value, key) => {
+							const file = this.formatRegistry.createFileFromAsset(asset, context);
+							await file.loadData(this.connection);
+							if (key === 0) {
+								this.showViewer([file], file.title)
+									.catch(error => Utils.exception(this, error));
+							}
+							else {
+								const tab = openMapTabs[key - 1];
+								this.$refs.tabs.selectTab(tab);
+								tab.$children[0].addGeoTiff(file, file.title);
+							}	
+							return true; // return true to close the modal
+						}
+					}
+				]
 			);
 		},
 		async showViewer(files, title = null, id = null, reUseExistingTab = false) {
@@ -259,7 +327,7 @@ export default {
 					}
 					await file.loadData(this.connection);
 					this.$refs.tabs.addTab(
-						title, file.icon, file, tabId, true, true,
+						title, file.icon, file, tabId, true, this.editable,
 						tab => this.onShow(tab),
 						tab => this.onHide(tab)
 					);

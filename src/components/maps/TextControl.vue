@@ -1,11 +1,9 @@
 <template>
-	<div v-if="texts.length > 0" class="ol-unselectable ol-control value" @click="toggle" :class="{pointer: texts.length > 1}">
-		{{ current }}
-	</div>
+	<div v-if="texts.length > 0" class="ol-unselectable ol-control value" @click="toggle" :class="{pointer: texts.length > 1}">{{ current }}</div>
 </template>
 
 <script>
-import ControlMixin from './ControlMixin.vue';
+import ControlMixin from './ControlMixin';
 
 export default {
 	name: 'TextControl',
@@ -38,7 +36,7 @@ export default {
 	},
 	props: {
 		text: {
-			text: [
+			type: [
 				String,
 				Array
 			],
@@ -61,6 +59,9 @@ export default {
 	max-width: calc(100% - 2*(2.375em + 6px));
 	box-sizing: border-box;
 	background-color: rgba(255,255,255,0.6);
+	white-space: pre-wrap;
+	font-family: monospace;
+	padding: 0.2em;
 }
 .pointer {
 	cursor: pointer;

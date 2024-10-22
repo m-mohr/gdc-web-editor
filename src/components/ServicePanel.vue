@@ -1,25 +1,31 @@
 <template>
-	<DataTable ref="table" :data="data" :columns="columns" class="ServicePanel">
-		<template slot="toolbar">
-			<button title="Add new permanently stored web service" @click="createServiceFromScript()" v-show="supportsCreate" :disabled="!this.hasProcess"><i class="fas fa-plus"></i> Create</button>
-			<button title="Quickly show the process on map without storing it permanently" @click="quickViewServiceFromScript()" v-show="supportsQuickView" :disabled="!this.hasProcess"><i class="fas fa-map"></i> Show on Map</button>
-			<SyncButton name="web services" :sync="() => updateData(true)" />
-		</template>
-		<template #actions="p">
-			<button title="Details" @click="serviceInfo(p.row)" v-show="supportsRead"><i class="fas fa-info"></i></button>
-			<button title="Edit metadata" @click="editMetadata(p.row)" v-show="supportsUpdate"><i class="fas fa-edit"></i></button>
-			<button title="Edit process" @click="showInEditor(p.row)" v-show="supportsRead"><i class="fas fa-project-diagram"></i></button>
-			<button title="Delete" @click="deleteService(p.row)" v-show="supportsDelete"><i class="fas fa-trash"></i></button>
-			<button v-show="p.row.enabled && isMapServiceSupported(p.row.type)" title="View on map" @click="viewService(p.row)"><i class="fas fa-map"></i></button>
-			<button title="Export / Share" @click="shareResults(p.row)" v-show="p.row.enabled && canShare"><i class="fas fa-share"></i></button>
-			<button title="View logs" @click="showLogs(p.row)" v-show="supportsDebug"><i class="fas fa-bug"></i></button>
-		</template>
-	</DataTable>
+	<div id="ServicePanel">
+		<DataTable ref="table" fa :data="data" :columns="columns" :next="next" :missing="missing" :federation="federation" class="ServicePanel">
+			<template slot="toolbar">
+				<AsyncButton title="Create a new permanent service from the process in the process editor" :fn="createServiceFromScript" v-show="supportsCreate" :disabled="!this.hasProcess" fa confirm icon="fas fa-plus">Create</AsyncButton>
+				<AsyncButton title="Quickly show the process on map without storing it permanently" :fn="quickViewServiceFromScript" v-show="supportsQuickView" :disabled="!this.hasProcess" fa confirm icon="fas fa-map">Show on Map</AsyncButton>
+				<SyncButton v-if="supportsList" :name="pluralizedName" :sync="reloadData" />
+				<FullscreenButton :element="() => this.$el" />
+			</template>
+			<template #actions="p">
+				<AsyncButton title="Show details about this service" :fn="() => serviceInfo(p.row)" v-show="supportsRead" fa icon="fas fa-info"></AsyncButton>
+				<AsyncButton title="Edit the metadata of this service" :fn="() => editMetadata(p.row)" v-show="supportsUpdate" fa icon="fas fa-edit"></AsyncButton>
+				<AsyncButton title="Edit the process of this service in the process editor" confirm :fn="() => showInEditor(p.row)" v-show="supportsRead" fa icon="fas fa-project-diagram"></AsyncButton>
+				<AsyncButton title="Delete this service from the server" :fn="() => deleteService(p.row)" v-show="supportsDelete" fa icon="fas fa-trash"></AsyncButton>
+				<AsyncButton title="View this service" :fn="() => viewService(p.row)" v-show="p.row.enabled && isMapServiceSupported(p.row.type)" fa icon="fas fa-map"></AsyncButton>
+				<AsyncButton title="Export and/or share this service" :fn="() => shareResults(p.row)" v-show="p.row.enabled && canShare" fa icon="fas fa-share"></AsyncButton>
+				<AsyncButton title="View the logs of this service" :fn="() => showLogs(p.row)" v-show="supportsDebug" fa icon="fas fa-bug"></AsyncButton>
+			</template>
+		</DataTable>
+	</div>
 </template>
 
 <script>
 import EventBusMixin from './EventBusMixin';
 import WorkPanelMixin from './WorkPanelMixin';
+import FieldMixin from './FieldMixin';
+import AsyncButton from '@openeo/vue-components/components/internal/AsyncButton.vue';
+import FullscreenButton from './FullscreenButton.vue';
 import SyncButton from './SyncButton.vue';
 import Utils from '../utils';
 import { Service } from '@openeo/js-client';
@@ -27,8 +33,14 @@ import { mapMutations } from 'vuex';
 
 export default {
 	name: 'ServicePanel',
-	mixins: [WorkPanelMixin('services', 'web service', 'web services'), EventBusMixin],
+	mixins: [
+		WorkPanelMixin('services', 'web service', 'web services'),
+		EventBusMixin,
+		FieldMixin
+	],
 	components: {
+		AsyncButton,
+		FullscreenButton,
 		SyncButton
 	},
 	data() {
@@ -52,25 +64,30 @@ export default {
 					name: 'Web Service',
 					computedValue: row => Utils.getResourceTitle(row),
 					format: value => Utils.formatIdOrTitle(value),
-					edit: this.supportsUpdate ? this.updateTitle : null
+					edit: this.supportsUpdate ? this.updateTitle : null,
+					width: '30%'
 				},
 				type: {
 					name: 'Type',
 					format: value => typeof value === 'string' ? value.toUpperCase() : value,
+					width: '15%'
 				},
 				enabled: {
 					name: 'Enabled',
-					edit: this.supportsUpdate ? this.toggleEnabled : null
+					edit: this.supportsUpdate ? this.toggleEnabled : null,
+					width: '5%'
 				},
 				created: {
 					name: 'Submitted',
 					format: 'Timestamp',
-					sort: 'desc'
+					sort: 'desc',
+					width: '15%'
 				},
 				actions: {
 					name: 'Actions',
 					filterable: false,
-					sort: false
+					sort: false,
+					width: '35%'
 				}
 			};
 		},
@@ -119,8 +136,8 @@ export default {
 		isMapServiceSupported(type) {
 			return Utils.isMapServiceSupported(type);
 		},
-		showInEditor(service) {
-			this.refreshElement(service, updatedService => this.broadcast('editProcess', updatedService));
+		async showInEditor(service) {
+			await this.refreshElement(service, updatedService => this.broadcast('editProcess', updatedService));
 		},
 		showLogs(service) {
 			this.broadcast('viewLogs', service);
@@ -138,52 +155,12 @@ export default {
 			}
 			Utils.confirm(this, 'Web Service created!', buttons);
 		},
-		getTitleField(value = null) {
-			return {
-				name: 'title',
-				label: 'Title',
-				schema: {type: 'string'},
-				default: null,
-				value: value,
-				optional: true
-			};
-		},
-		getDescriptionField(value = null) {
-			return {
-				name: 'description',
-				label: 'Description',
-				schema: {type: 'string', subtype: 'commonmark'},
-				default: null,
-				value: value,
-				description: 'CommonMark (Markdown) is allowed.',
-				optional: true
-			};
-		},
 		getServiceTypeField(value = undefined) {
 			return {
 				name: 'type',
 				label: 'Type',
 				schema: {type: 'string', subtype: 'service-type'},
 				value: value
-			};
-		},
-		getBillingPlanField(value = undefined) {
-			return {
-				name: 'plan',
-				label: 'Billing plan',
-				schema: {type: 'string', subtype: 'billing-plan'},
-				value: value,
-				optional: true
-			};
-		},
-		getBudgetField(value = null) {
-			return {
-				name: 'budget',
-				label: 'Budget limit',
-				schema: {type: 'number', subtype: 'budget'},
-				default: null,
-				value: value,
-				optional: true
 			};
 		},
 		getEnabledField(value = true) {
@@ -229,7 +206,17 @@ export default {
 		async createService(script, data, quiet = false) {
 			data = this.normalizeToDefaultData(data);
 			try {
-				let service = await this.create({parameters: [script, data.type, data.title, data.description, data.enabled, data.configuration, data.plan, data.budget]});
+				let service = await this.create([
+					script,
+					data.type,
+					data.title,
+					data.description,
+					data.enabled,
+					data.configuration,
+					data.plan,
+					data.budget,
+					{log_level: data.log_level}
+				]);
 				if (!quiet) {
 					this.serviceCreated(service);
 				}
@@ -239,17 +226,24 @@ export default {
 				return null;
 			}
 		},
-		createServiceFromScript() {
+		async createServiceFromScript() {
 			var fields = [
 				this.getTitleField(),
 				this.getDescriptionField(),
 				this.getServiceTypeField(),
 				this.getEnabledField(),
+				this.getLogLevelField(),
 				this.supportsBillingPlans ? this.getBillingPlanField() : null,
 				this.supportsBilling ? this.getBudgetField() : null,
 				this.getConfigField()
 			];
-			this.broadcast('showDataForm', "Create new web service", fields, data => this.createService(this.process, data));
+			return new Promise((resolve, reject) => {
+				this.broadcast('showDataForm', "Create new web service", fields, data => {
+					this.createService(this.process, data)
+						.then(service => service ? resolve(service) : reject())
+						.catch(reject);
+				});
+			});
 		},
 		async quickViewServiceFromScript() {
 			try {
@@ -267,12 +261,13 @@ export default {
 				Utils.exception(this, error, "Show on Map Error");
 			}
 		},
-		editMetadata(oldService) {
-			this.refreshElement(oldService, service => {
+		async editMetadata(oldService) {
+			await this.refreshElement(oldService, service => {
 				var fields = [
 					this.getTitleField(service.title),
 					this.getDescriptionField(service.description),
 					this.getEnabledField(service.enabled),
+					this.getLogLevelField(service.log_level),
 					this.supportsBillingPlans ? this.getBillingPlanField(service.plan) : null,
 					this.supportsBilling ? this.getBudgetField(service.budget) : null,
 					this.getConfigField(service.configuration)
@@ -280,14 +275,19 @@ export default {
 				this.broadcast('showDataForm', "Edit web service", fields, data => this.updateService(service, data));
 			});
 		},
-		serviceInfo(service) {
-			this.refreshElement(service, updatedService => {
+		async serviceInfo(service) {
+			await this.refreshElement(service, updatedService => {
 				this.broadcast('showModal', 'ServiceInfoModal', {service: updatedService.getAll()});
 			});
 		},
-		replaceProcess(service, process) {
+		async replaceProcess(service, process, resolve, reject) {
 			if (service instanceof Service) {
-				this.updateService(service, {process: process});
+				try {
+					await this.updateService(service, {process: process});
+					resolve();
+				} catch(error) {
+					reject(error);
+				}
 			}
 		},
 		updateTitle(service, newTitle) {
@@ -312,6 +312,9 @@ export default {
 				await this.delete({data: service});
 				this.broadcast('removeWebService', service.id);
 				delete this.createdQuickViews[service.id];
+				if (this.hasMore) {
+					this.reloadData();
+				}
 			} catch(error) {
 				if (quiet) {
 					console.error(error);
@@ -321,32 +324,30 @@ export default {
 				}
 			}
 		},
-		viewService(service, onClose = null) {
-			this.refreshElement(service, updatedService => this.broadcast('viewWebService', updatedService, onClose));
+		async viewService(service, onClose = null) {
+			await this.refreshElement(service, updatedService => this.broadcast('viewWebService', updatedService, onClose));
 		},
 		async shareResults(service) {
 			if (this.canShare) {
-				this.refreshElement(service, service2 => {
-					if (!service.enabled) {
-						Utils.error(this, "Sorry, only enabled services can be shared.");
-					}
-					else if (service2.url) {
-						this.broadcast('showModal', 'ShareModal', {url: service2.url, title: service2.title, context: service2});
-					}
-					else {
-						Utils.error(this, "Sorry, this service has no public URL.");
-					}
-				});
+				return;
 			}
+			await this.refreshElement(service, service2 => {
+				if (!service.enabled) {
+					Utils.error(this, "Sorry, only enabled services can be shared.");
+				}
+				else if (service2.url) {
+					this.broadcast('showModal', 'ShareModal', {url: service2.url, title: service2.title, context: service2});
+				}
+				else {
+					Utils.error(this, "Sorry, this service has no public URL.");
+				}
+			});
 		}
 	}
 }
 </script>
 
 <style>
-.ServicePanel .title {
-	width: 25%;
-}
 .ServicePanel .type {
 	text-align: center;
 }

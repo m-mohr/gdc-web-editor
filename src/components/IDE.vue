@@ -4,29 +4,30 @@
 			<header class="navbar">
 				<Logo />
 				<ul id="menu">
-					<li><div class="menuItem" @click="showHelp" title="Start a guided tour"><i class="fas fa-question-circle fa-fw"></i>Help</div></li>
-					<li><div class="menuItem" @click="showWizard()" title="Start the process wizard"><i class="fas fa-magic fa-fw"></i>Wizard</div></li>
+					<li v-if="!simpleMode"><div class="menuItem" @click="showHelp" title="Start a guided tour"><i class="fas fa-question-circle fa-fw"></i>Help</div></li>
+					<li v-if="!simpleMode"><div class="menuItem" @click="showWizard()" title="Start the process wizard"><i class="fas fa-magic fa-fw"></i>Wizard</div></li>
 					<li><div class="menuItem" @click="showServerInfo" title="Get server information"><i class="fas fa-info-circle fa-fw"></i>Server</div></li>
 					<li><UserMenu /></li>
 				</ul>
 			</header>
 			<Splitpanes class="default-theme" @resize="resized" @pane-maximize="resized">
-				<Pane id="discovery" :size="splitpaneSizeH[0]">
+				<Pane v-if="!simpleMode" id="discovery" :size="splitpaneSizeH[0]">
 					<DiscoveryToolbar class="toolbar tour-ide-discovery" :onAddProcess="insertProcess" :collectionPreview="true" :persist="true" />
 				</Pane>
-				<Pane id="workspace" :size="splitpaneSizeH[1]">
+				<Pane v-if="!simpleMode || hasProcess" id="workspace" :size="splitpaneSizeH[1]">
 					<Splitpanes class="default-theme" horizontal @resize="resized" @pane-maximize="resized">
 						<Pane id="editor" :size="splitpaneSizeV[0]">
 							<Editor ref="editor" class="mainEditor tour-ide-editor" id="main" :value="process" @input="updateEditor" :title="contextTitle" showIntro>
 								<template #file-toolbar>
-									<button type="button" @click="importProcess" title="Import process from external source"><i class="fas fa-cloud-download-alt"></i></button>
-									<button type="button" v-show="saveSupported" :disabled="!hasProcess" @click="saveProcess" :title="'Save to ' + contextTitle"><i class="fas fa-save"></i></button>
-									<button type="button" @click="exportCode" :disabled="!hasProcess" title="Export into another programming language"><i class="fas fa-file-export"></i></button>
-									<button type="button" v-show="validateSupported" :disabled="!hasProcess" @click="validateProcess" title="Validate process on server-side"><i class="fas fa-tasks"></i></button>
+									<BButton @click="importProcess" title="Import a process from an external source"><i class="fas fa-cloud-download-alt"></i></BButton>
+									<AsyncButton v-show="saveSupported" :disabled="!hasProcess" :fn="saveProcess" :title="'Save this process to ' + contextTitle" fa confirm icon="fas fa-save"></AsyncButton>
+									<BButton @click="exportJSON" :disabled="!hasProcess" title="Download this process as a JSON file"><i class="fas fa-file-download"></i></BButton>
+									<BButton @click="exportCode" :disabled="!hasProcess" title="Export this process into another programming language"><i class="fas fa-file-export"></i></BButton>
+									<AsyncButton v-show="validateSupported" :disabled="!hasProcess" :fn="validateProcess" title="Validate this process directly on the server" fa confirm icon="fas fa-tasks"></AsyncButton>
 								</template>
 							</Editor>
 						</Pane>
-						<Pane id="user" :size="splitpaneSizeV[1]">
+						<Pane v-if="!simpleMode" id="user" :size="splitpaneSizeV[1]">
 							<UserWorkspace v-if="isAuthenticated" class="userContent tour-ide-workspace" />
 							<div v-else class="message info" title="Login is required to interact with the server.">
 								<i class="fas fa-sign-in-alt"></i>
@@ -36,7 +37,7 @@
 					</Splitpanes>
 				</Pane>
 				<Pane id="viewer" :class="{empty: !showViewer}" :size="splitpaneSizeH[2]">
-					<Viewer class="tour-ide-viewer" @empty="onViewerEmpty" />
+					<Viewer class="tour-ide-viewer" :editable="!simpleMode" @empty="onViewerEmpty" />
 				</Pane>
 			</Splitpanes>
 		</div>
@@ -55,11 +56,15 @@ import DiscoveryToolbar from './DiscoveryToolbar.vue';
 import { ProcessParameter } from '@openeo/js-commons';
 import { Job, Service, UserProcess } from '@openeo/js-client';
 import { Splitpanes, Pane } from 'splitpanes';
+import BButton from '@openeo/vue-components/components/internal/BButton.vue';
+import AsyncButton from '@openeo/vue-components/components/internal/AsyncButton.vue';
 
 export default {
 	name: 'IDE',
 	mixins: [EventBusMixin],
 	components: {
+		AsyncButton,
+		BButton,
 		DiscoveryToolbar,
 		Editor,
 		Logo,
@@ -79,7 +84,7 @@ export default {
 	computed: {
 		...Utils.mapState(['connection', 'isAuthenticated']),
 		...Utils.mapState('editor', ['appMode', 'context', 'process', 'collectionPreview', 'openWizard', 'openWizardProps']),
-		...Utils.mapGetters(['title', 'apiVersion', 'supports']),
+		...Utils.mapGetters(['title', 'apiVersion', 'supports', 'federation']),
 		...Utils.mapGetters('editor', ['hasProcess']),
 		...Utils.mapGetters('jobs', {supportsJobUpdate: 'supportsUpdate'}),
 		...Utils.mapGetters('services', {supportsServiceUpdate: 'supportsUpdate'}),
@@ -99,6 +104,9 @@ export default {
 		},
 		validateSupported() {
 			return this.supports('validateProcess');
+		},
+		simpleMode() {
+			return this.appMode && !this.isAuthenticated;
 		},
 		splitpaneSizeH() {
 			if (this.appMode) {
@@ -186,8 +194,15 @@ export default {
 			this.broadcast('showModal', 'ImportProcessModal', {}, events);
 		},
 
-		saveProcess() {
-			this.broadcast('replaceProcess', this.context, this.process);
+		async saveProcess() {
+			return new Promise((resolve, reject) => {
+				this.broadcast('replaceProcess', this.context, this.process, resolve, reject);
+			});
+		},
+
+		exportJSON() {
+			const filename = (this.contextTitle || "openeo-process") + '.json';
+			Utils.saveToFile(JSON.stringify(this.process, null, 2), filename);
 		},
 
 		async exportCode() {
@@ -206,22 +221,52 @@ export default {
 
 		async validateProcess() {
 			if (!this.validateSupported) {
-				return Utils.error(this, "Server doesn't support validation");
+				Utils.error(this, "Server doesn't support validation");
+				return false;
 			}
 			else if (!this.hasProcess) {
-				return Utils.info(this, 'Nothing to validate...');
+				Utils.info(this, 'Nothing to validate...');
+				return true;
 			}
 			try {
+				let isFederated = Utils.size(this.connection.capabilities().toJSON().federation) > 0;
 				let errors = await this.connection.validateProcess(this.process);
 				if (errors.length > 0) {
+					// log entries require a `level` attribute
 					errors.forEach(error => error.level = 'error');
-					this.broadcast('viewLogs', errors, 'Validation Result', 'fa-tasks');
+					// build applicable message and possibly add it to the `errors` object so that it shows up in the logs
+					let toastMessage, logMessage;
+					if(isFederated) {
+						if(Array.isArray(errors['federation:backends']) && errors['federation:backends'].length > 0) {
+							let backendTitles = errors['federation:backends'].map(backendId => this.federation[backendId].title);
+							toastMessage = "The process is invalid (see logs for details)"
+							logMessage = "The process is invalid, as checked by these back-ends of the federation: " + backendTitles.join(', ');
+						} else {
+							toastMessage = "The process could not be validated successfully by any of the back-ends or the federation component itself";
+							logMessage = toastMessage;
+						}
+						let logEntry = {
+							id: 'InsertedByWebEditor',
+							message: logMessage,
+							level: 'info'
+						};
+						errors = [logEntry, ...errors];   // like this instead of .push() to prepend instead of append (loses the federation:backends attribute but that's okay at this point)
+					} else {
+						toastMessage = "The process is invalid";
+					}
+					// notify via toast and show errors in logs area
+					Utils.error(this, toastMessage);
+					this.broadcast('viewLogs', errors, 'Validation Result', true, 'fa-tasks');
+					return false;
 				}
 				else {
+					// only notify via toast and ignore potential information in `errors['federation:backends']` because it's not so important in the positive case and the space in the toast is limited
 					Utils.ok(this, "The process is valid");
+					return true;
 				}
 			} catch (error) {
 				Utils.exception(this, error, "Validation rejected");
+				return false;
 			}
 		},
 
@@ -325,13 +370,6 @@ export default {
 #discovery {
 	height: 100%;
 	overflow: auto;
-
-	.search-box {
-		margin: 1rem;
-	}
-	.category {
-		padding: 5px 1em;
-	}
 }
 #user {
 	min-height: 2.5em;

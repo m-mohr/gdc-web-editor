@@ -1,8 +1,9 @@
 import VueUtils from '@openeo/vue-components/utils';
-import { Job, Service, UserFile, UserProcess } from '@openeo/js-client';
+import { Job, OpenEO, Service, UserFile, UserProcess } from '@openeo/js-client';
 import { mapState, mapActions, mapMutations, mapGetters } from 'vuex';
 import contentType from 'content-type';
 import Config from '../config';
+import axios from 'axios';
 
 export const JSON_TYPES = [
 	'application/json',
@@ -19,8 +20,12 @@ class Utils extends VueUtils {
 		return stac.links.find(link => link.rel === rel && (!types || types.includes(link.type))) || null;
 	}
 
-	static isCoverage(collection) {
-		return Utils.getLink(collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage', null);
+	static axios() {
+		return OpenEO.Environment.axios;
+	}
+
+	static saveToFile(content, filename) {
+		return OpenEO.Environment.saveToFile(content, filename);
 	}
 
 	static getPreviewLinkFromSTAC(stac) {
@@ -46,35 +51,6 @@ class Utils extends VueUtils {
 		}
 		else {
 			return typeof value === "string" && value.toLowerCase() === "nan" ? Number.NaN : value;
-		}
-	}
-
-	static displayRGBA(data, nodata = [NaN, null], hasAlpha = true) {
-		let NA = 'no data';
-		if (typeof data === 'undefined' || data === null) {
-			return NA;
-		}
-		let values = Array.from(data).map(v => parseFloat(v.toFixed(6)));
-		if (values.length === 0) {
-			return '-';
-		}
-
-		let a = 1;
-		if (hasAlpha && data.length > 1) {
-			a = values.pop();
-		}
-
-		// Transparent (no-data)
-		if (a === 0 || values.find(v => nodata.includes(v)) !== undefined) {
-			return NA;
-		}
-		// Grayscale (all values are the same)
-		else if (values.every(v => v === values[0])) {
-			return values[0];
-		}
-		// RGB and others
-		else {
-			return values.join(' | ');
 		}
 	}
 
@@ -457,6 +433,10 @@ class Utils extends VueUtils {
 		else {
 			return null;
 		}
+	}
+
+	static confirmOpenAll(files) {
+		return confirm(`You are about to open ${files.length} individual files / tabs, which could slow down the web browser. Are you sure you want to open all of them?`);
 	}
 
 };

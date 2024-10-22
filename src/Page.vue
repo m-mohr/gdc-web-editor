@@ -19,10 +19,6 @@
 import EventBusMixin from './components/EventBusMixin.js';
 import Utils from './utils';
 import ConnectForm from './components/ConnectForm.vue';
-import axios from 'axios';
-
-// Making axios available globally for the OpenEO JS client
-window.axios = axios;
 
 export default {
 	name: 'openeo-web-editor',
@@ -30,6 +26,7 @@ export default {
 	components: {
 		ConnectForm,
 		IDE: () => import('./components/IDE.vue'),
+		AddMapDataModal: () => import('./components/modals/AddMapDataModal.vue'),
 		CollectionModal: () => import('./components/modals/CollectionModal.vue'),
 		DataModal: () => import('./components/modals/DataModal.vue'),
 		DownloadAssetsModal: () => import('./components/modals/DownloadAssetsModal.vue'),
@@ -70,10 +67,15 @@ export default {
 		});
 		this.setCollectionPreview(Utils.param('preview-collection'));
 
-		let resultUrl = Utils.param('result');
+		const resultUrl = Utils.param('result');
+		let resultType = 'job';
+		if (Utils.param('app~service')) {
+			resultType = 'service';
+		}
 		if (resultUrl) {
 			this.setAppMode({
 				resultUrl,
+				resultType,
 				...Utils.paramsForPrefix('app')
 			});
 		}
@@ -86,12 +88,12 @@ export default {
 			this.skipLogin = false;
 		}
 
+		const axios = Utils.axios();
 		// Count active requests
 		axios.interceptors.request.use(config => {
 			this.startActiveRequest();
 			return config;
 		});
-
 		// Add a response interceptor
 		axios.interceptors.response.use(response => {
 			this.endActiveRequest();

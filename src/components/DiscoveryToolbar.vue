@@ -1,8 +1,21 @@
 <template>
 	<div class="discovery-toolbar">
 		<SearchBox v-model="searchTerm" />
+		<div class="filters">
+			<span class="label">
+				Show
+			</span>
+			<label class="show-deprecated" title="Show deprecated elements?">
+				<input type="checkbox" v-model="showDeprecated">
+				deprecated
+			</label>
+			<label class="show-experimental" title="Show experimental elements?">
+				<input type="checkbox" v-model="showExperimental">
+				experimental
+			</label>
+		</div>
 		<div class="search-results">
-			<Collections class="category" :collections="collections" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed">
+			<Collections class="category" :collections="collections" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed" :hideDeprecated="!showDeprecated" :hideExperimental="!showExperimental" :federation="federation" :missing="federationMissing.collections">
 				<template #summary="{ item }">
 					<div class="discovery-entity" :draggable="supportsLoadCollection" @dragstart="onDrag($event, 'collection', item)">
 						<div class="discovery-info" @click="showCollectionInfo(item.id)">
@@ -21,7 +34,7 @@
 				</template>
 			</Collections>
 
-			<Processes class="category" :processes="allProcesses" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed">
+			<Processes class="category" :processes="allProcesses" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed" :hideDeprecated="!showDeprecated" :hideExperimental="!showExperimental" :federation="federation" :missing="federationMissing.processes">
 				<template #summary="{ item }">
 					<div class="discovery-entity" draggable="true" @dragstart="onDrag($event, 'process', item)">
 						<div class="discovery-info" @click="showProcess(item)">
@@ -38,7 +51,7 @@
 				</template>
 			</Processes>
 
-			<UdfRuntimes v-if="hasUdfRuntimes" class="category" :runtimes="udfRuntimes" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed">
+			<UdfRuntimes v-if="hasUdfRuntimes" class="category" :runtimes="udfRuntimes" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed" :hideDeprecated="!showDeprecated" :hideExperimental="!showExperimental" :federation="federation">
 				<template #summary="{ summary, item }">
 					<div class="discovery-entity" :draggable="supportsRunUdf" @dragstart="onDrag($event, 'udf', {runtime: summary.identifier, version: item.default})">
 						<div class="discovery-info" @click="showUdfInfo(summary.identifier, item)">
@@ -49,7 +62,7 @@
 				</template>
 			</UdfRuntimes>
 
-			<FileFormats class="category" :formats="fileFormats" :showInput="false" heading="Export File Formats" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed">
+			<FileFormats class="category" :formats="fileFormats" :showInput="false" heading="Export File Formats" :searchTerm="searchTerm" :offerDetails="false" :collapsed="collapsed" :hideDeprecated="!showDeprecated" :hideExperimental="!showExperimental" :federation="federation" :missing="federationMissing.fileFormats">
 				<template #summary="{ item }">
 					<div class="discovery-entity" :draggable="supportsSaveResult" @dragstart="onDrag($event, 'fileformat', item)">
 						<div class="discovery-info" @click="showFileFormatInfo(item)">
@@ -99,13 +112,16 @@ export default {
 	data() {
 		return {
 			internalSearchTerm: '',
-			collapsed: true
+			collapsed: true,
+			showDeprecated: this.$config.showDeprecatedByDefault || false,
+			showExperimental: this.$config.showExperimentalByDefault || false,
 		};
 	},
 	computed: {
 		...Utils.mapState(['collections', 'udfRuntimes']),
 		...Utils.mapState('editor', ['discoverySearchTerm']),
-		...Utils.mapGetters(['supports', 'fileFormats', 'processes']),
+		...Utils.mapState(['federationMissing']),
+		...Utils.mapGetters(['federation', 'supports', 'fileFormats', 'processes']),
 		supportsLoadCollection() {
 			return this.processes.has('load_collection');
 		},
@@ -154,10 +170,10 @@ export default {
 		}
 	},
 	methods: {
-		...Utils.mapMutations('editor', ['setDiscoverySearchTerm', 'setModelDnd']),
+		...Utils.mapMutations('editor', ['setDiscoverySearchTerm', 'setModelDnD']),
 		...Utils.mapActions(['loadProcess']),
 		onDrag(event, type, data) {
-			let fn = (loading) => this.setModelDnd({type, data, loading});
+			let fn = (loading) => this.setModelDnD({type, data, loading});
 			if (type === 'process') {
 				fn(true);
 				this.loadProcess(data).then(() => fn(false));
@@ -232,15 +248,39 @@ export default {
 .search-results {
 	overflow-y: auto;
 	flex-grow: 1;
+	margin: 0.25rem 0 0 0;
+}
+
+.search-box {
+	margin: 1rem 1rem 0.25rem 1rem;
+}
+.filters {
+	display: flex;
+	justify-content: center;
+	flex-flow: row wrap;
+
+	.show-deprecated, .show-experimental, .label {
+		align-content: center;
+		display: inline-block;
+		white-space: nowrap;
+		margin: 0.25rem;
+		font-size: 0.9em;
+		cursor: pointer;
+	}
+	.label {
+		cursor: default;
+	}
+
 }
 
 .category {
-	padding: 5px;
-}
-.category strong {
-	cursor: pointer;
-	overflow: hidden;
-	white-space: nowrap;
+	margin: 0.75rem 1rem 0.5rem 1rem;
+
+	strong {
+		cursor: pointer;
+		overflow: hidden;
+		white-space: nowrap;
+	}
 }
 
 .discovery-entity {
