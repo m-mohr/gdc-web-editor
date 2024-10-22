@@ -35,7 +35,7 @@ import ChooseTime from './tabs/ChooseTime.vue';
 import WizardMixin from './WizardMixin';
 import Utils from '../../utils';
 import EventBusMixin from '../EventBusMixin';
-import { OpenEO, AbortController } from '@openeo/js-client';
+import { Client } from '@openeo/js-client';
 import { cancellableRequest } from '../cancellableRequest';
 
 const DEFAULT_TYPE = "default";
@@ -196,7 +196,7 @@ export default {
 			console.log(href);
 
 			const callback = async (abortController) => {
-				const response = await this.connection._get(href, {}, OpenEO.Environment.getResponseType(), abortController);
+				const response = await this.connection._get(href, {}, Client.Environment.getResponseType(), abortController);
 				let result = {
 					data: response.data,
 					type: response.headers['content-type'] || null

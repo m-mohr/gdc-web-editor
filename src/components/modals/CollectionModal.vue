@@ -82,34 +82,6 @@ export default {
 			// Always request a page in advance so that we know whether a next page is available.
 			this.nextItems();
 		}
-		if (this.isCoverage) {
-			const requests = [];
-			
-			let domainset = Utils.getLink(this.collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage-domainset');
-			if (domainset) {
-				requests.push(
-					this.connection._get(domainset.href)
-						.then(r => {
-							this.$set(this.coverage, 'DomainSet', r.data.generalGrid);
-							if (r.data.interpolationRestriction) {
-								this.$set(this.coverage, 'InterpolationRestriction ', r.data.interpolationRestriction);
-							}
-						})
-				);
-			}
-
-			let rangetype = Utils.getLink(this.collection, 'http://www.opengis.net/def/rel/ogc/1.0/coverage-rangetype');
-			if (rangetype) {
-				requests.push(
-					this.connection._get(rangetype.href)
-						.then(r => this.$set(this.coverage, 'DataRecord', r.data.field))
-				);
-			}
-
-			try {
-				await Promise.all(requests);
-			} catch (error) {}
-		}
 	},
 	methods: {
 		downloadCoverage() {
