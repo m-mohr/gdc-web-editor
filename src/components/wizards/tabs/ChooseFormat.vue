@@ -46,7 +46,7 @@ export default {
 			else {
 				return {
 					type: "output-format",
-					optionFilter: this.filterFormats()
+					optionFilter: this.filterFormats ? this.filterFormats() : null
 				};
 			}
 		},

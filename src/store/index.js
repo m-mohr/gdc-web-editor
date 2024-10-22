@@ -1,7 +1,7 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
 
-import { OpenEO, FileTypes, Formula } from '@openeo/js-client';
+import { Client, FileTypes, Formula } from '@openeo/js-client';
 import { ProcessRegistry } from '@openeo/js-commons';
 import StacMigrate from '@radiantearth/stac-migrate';
 import Utils from '../utils.js';
@@ -13,7 +13,7 @@ import files from './files';
 import jobs from './jobs';
 import services from './services';
 import userProcesses from './userProcesses';
-import Migrate from '@openeo/js-client/src/gdc/migrate.js';
+import Migrate from '@openeo/js-client/src/ogc/migrate.js';
 
 Vue.use(Vuex);
 
@@ -156,7 +156,7 @@ export default new Vuex.Store({
 			// Connect and request capabilities
 			let connection = null;
 			try {
-				connection = await OpenEO.connect(url, {addNamespaceToProcess: true});
+				connection = await Client.connect(url, {addNamespaceToProcess: true});
 			} catch (error) {
 				if(error.message == 'Network Error' || error.name == 'NetworkError') {
 					error = new Error("Server is not available.");
@@ -313,7 +313,7 @@ export default new Vuex.Store({
 				return null;
 			}
 			if (typeof process.version !== 'undefined') {
-				// GDC API
+				// OGC API
 				let response = await cx.state.connection._get(`/processes/${process.id}`);
 				cx.state.connection.processes.add(Migrate.process(response.data));
 			}

@@ -103,11 +103,11 @@ export default class JavaScript extends Exporter {
 	}
 
 	generateImports() {
-		this.addCode(`import { OpenEO, Formula } from '@openeo/js-client';`);
+		this.addCode(`import { Client, Formula } from '@openeo/js-client';`);
 	}
 
 	generateConnection() {
-		this.addCode(`let connection = await OpenEO.connect('${this.getServerUrl()}');`);
+		this.addCode(`let connection = await Client.connect('${this.getServerUrl()}');`);
 	}
 
 	generateAuthentication() {

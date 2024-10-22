@@ -164,7 +164,7 @@ export default {
 		},
 		async executeProcess() {
 			const callback = async (abortController) => {
-				const result = await this.connection.computeResult(this.process, null, null, abortController);
+				const result = await this.connection.computeResult(this.process, abortController);
 				this.broadcast('viewSyncResult', result);
 			};
 			try {
@@ -213,9 +213,7 @@ export default {
 					process,
 					data.title,
 					data.description,
-					data.plan,
-					data.budget,
-					{log_level: data.log_level}
+					{log_level: data.log_level, plan: data.plan, budget: data.budget}
 				]);
 				this.jobCreated(job);
 				return job;
@@ -367,7 +365,7 @@ export default {
 				Utils.exception(this, error, 'Cancel Job Error: ' + Utils.getResourceTitle(job));
 			}
 		},
-		handleGdcResults(job) {
+		handleOgcResults(job) {
 			if (job.extra.ogcapi) {
 				let url = this.connection.baseUrl + '/jobs/' + job.id + '/results';
 				window.open(url, '_blank');
@@ -376,7 +374,7 @@ export default {
 			return false;
 		},
 		async viewResults(job) {
-			if (this.handleGdcResults(job)) {
+			if (this.handleOgcResults(job)) {
 				return;
 			}
 			// Doesn't need to go through job store as it doesn't change job-related data
@@ -389,7 +387,7 @@ export default {
 			}
 		},
 		async downloadResults(job) {
-			if (this.handleGdcResults(job)) {
+			if (this.handleOgcResults(job)) {
 				return;
 			}
 			// Doesn't need to go through job store as it doesn't change job-related data

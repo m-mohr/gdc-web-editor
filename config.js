@@ -65,15 +65,29 @@ export default {
 	// List of supported wizards
 	supportedWizards: [
 		{
+			component: 'Download',
+			title: 'Download Data',
+			description: 'Just download a small portion of data from an openEO Collection.',
+			requirements: capabilities => capabilities.apiType() === 'openeo'
+		},
+		{
+			component: 'UDP',
+			title: options => typeof options.process === 'string' ? options.process.replace(/@.+/, '') : 'Run UDP',
+			description: 'Executes a user-defined process',
+			requirements: capabilities => capabilities.apiType() === 'openeo'
+		},
+		{
 			component: 'DownloadCoverage',
-			title: 'Download Coverage Data (OGC API)',
-			description: 'Download a portion of data from a coverage.'
+			title: 'Download Coverage Data',
+			description: 'Download a portion of data from a coverage.',
+			requirements: capabilities => capabilities.hasConformance('http://www.opengis.net/spec/ogcapi-coverages-1/1.0/conf/core')
 		},
 		{
 			component: 'SpectralIndices',
-			title: 'Compute Spectral Indices (openEO)',
+			title: 'Compute Spectral Indices',
 			description: 'A spectral index is a mathematical equation that is applied on the various spectral bands of an image per pixel. It is often used to highlight vegetation, urban areas, snow, burn, soil, or water/drought/moisture stress. Provided by Awesome Spectral Indices (https://github.com/awesome-spectral-indices/awesome-spectral-indices).',
-			requiredProcesses: ['reduce_dimension']
+			requiredProcesses: ['reduce_dimension'],
+			requirements: capabilities => capabilities.apiType() === 'openeo'
 		}
 	],
 
@@ -92,7 +106,7 @@ export default {
 	],
 
 	// Import processes from openeo-community-examples repo
-	importCommunityExamples: true,
+	importCommunityExamples: false,
 
 	// Additional process namespaces to load by default
 	processNamespaces: [],

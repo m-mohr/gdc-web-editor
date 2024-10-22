@@ -1,5 +1,5 @@
 const assert = require('assert');
-const PgParser = require('@openeo/js-client/src/gdc/parser');
+const PgParser = require('@openeo/js-client/src/ogc/parser');
 
 const tests = ['gnosis', 'whu'];
 

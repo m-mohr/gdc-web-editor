@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { OpenEO } from '@openeo/js-client';
+import { Client } from '@openeo/js-client';
 import TextEditor from '../TextEditor.vue';
 import Modal from './Modal.vue';
 import Utils from '../../utils';
@@ -94,7 +94,7 @@ export default {
 			else if (this.language === 'R') {
 				filename = 'code.r';
 			}
-			Utils.saveToFile(this.code, filename);
+			Client.Environment.saveToFile(this.code, filename);
 		}
 	}
 }

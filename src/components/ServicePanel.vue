@@ -213,9 +213,7 @@ export default {
 					data.description,
 					data.enabled,
 					data.configuration,
-					data.plan,
-					data.budget,
-					{log_level: data.log_level}
+					{log_level: data.log_level, plan: data.plan, budget: data.budget}
 				]);
 				if (!quiet) {
 					this.serviceCreated(service);
