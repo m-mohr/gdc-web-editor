@@ -1,7 +1,7 @@
 <template>
 	<div class="select-container">
 		<template v-if="loaded">
-			<MultiSelect v-model="selected" :key="type" ref="htmlElement" label="label" track-by="id" :multiple="multiple" :options="selectOptions" :allowEmpty="false" :preselectFirst="preselect" :disabled="!editable" :deselectLabel="deselectLabel" :taggable="taggable" :tagPlaceholder="tagPlaceholder" @tag="addValue"></MultiSelect>
+			<MultiSelect v-model="selected" :key="type" ref="htmlElement" label="label" track-by="id" :multiple="multiple" :options="selectOptions" :allowEmpty="false" :preselectFirst="preselect" :disabled="!editable" :deselectLabel="deselectLabel" :taggable="taggable" :tagPlaceholder="tagPlaceholder" :openDirection="openDirection" @tag="addValue"></MultiSelect>
 			<button v-if="showDetails" type="button" title="Details" @click="$emit('onDetails')"><i class="fas fa-info"></i></button>
 		</template>
 		<div class="loading" v-else><i class="fas fa-spinner fa-spin"></i> Loading options...</div>
@@ -37,6 +37,10 @@ export default {
 		optionFilter: {
 			type: Function,
 			default: null
+		},
+		openDirection: {
+			type: String,
+			default: 'auto'
 		}
 	},
 	computed: {
@@ -47,7 +51,7 @@ export default {
 					let collection = this.$store.state.collections.find(c => c.id == this.context);
 					if (Utils.isObject(collection)) {
 						try {
-							state = collection.summaries['eo:bands'].map(band => band.name);
+							state = collection.summaries['bands'].map(band => band.name);
 						} catch (error) {}
 						if (state.length === 0 && Utils.isObject(collection['cube:dimensions'])) {
 							try {
@@ -330,7 +334,7 @@ export default {
 			}
 		},
 		initSelection() {
-			let value = this.value;
+			let value = typeof this.value === 'undefined' ? this.schema.default() : this.value;
 			if (this.multiple && Array.isArray(value)) {
 				this.selected = this.selectOptions.filter(o => value.includes(o.id));
 			}
